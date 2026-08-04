@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">Díszkertek Munkalap</title>
+  <rect width="512" height="512" rx="108" fill="#edf4f0"/>
+  <circle cx="256" cy="244" r="184" fill="#fffdf7" stroke="#b7cbbd" stroke-width="8"/>
+  <path d="M234 355c-25-39-20-82 5-123 11-18 16-41 14-67 22 34 30 70 15 105 28-24 45-58 50-96 17 52 1 99-43 142 30-9 58-29 81-58-11 48-48 86-106 110z" fill="#72572b"/>
+  <path d="M155 376c67-19 139-18 205 2-66 14-136 14-205-2z" fill="#72572b"/>
+  <g fill="#2f7338">
+    <ellipse cx="174" cy="175" rx="49" ry="27" transform="rotate(30 174 175)"/><ellipse cx="231" cy="117" rx="49" ry="27" transform="rotate(75 231 117)"/>
+    <ellipse cx="300" cy="122" rx="49" ry="27" transform="rotate(112 300 122)"/><ellipse cx="357" cy="178" rx="51" ry="28" transform="rotate(145 357 178)"/>
+    <ellipse cx="144" cy="242" rx="50" ry="27" transform="rotate(8 144 242)"/><ellipse cx="374" cy="247" rx="52" ry="27" transform="rotate(174 374 247)"/>
+    <ellipse cx="208" cy="235" rx="46" ry="25" transform="rotate(55 208 235)"/><ellipse cx="320" cy="234" rx="46" ry="25" transform="rotate(125 320 234)"/>
+    <ellipse cx="264" cy="182" rx="49" ry="27" transform="rotate(90 264 182)"/>
+  </g>
+</svg>

@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Munkalap">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="stylesheet" href="styles.css">
+  <title>Díszkertek - Napi munkalap</title>
+</head>
+<body>
+  <main class="sheet">
+    <header class="sheet-header">
+      <img class="brand-logo" src="logo.svg" alt="Díszkertek">
+      <p class="kicker">Kertfenntartási munkák nyilvántartása</p>
+      <h1>NAPI MUNKALAP</h1>
+      <p class="year">2026</p>
+      <button id="installButton" type="button" hidden>Telepítés</button>
+    </header>
+
+    <form id="worksheetForm">
+      <section class="identity">
+        <label class="leader"><b>Csoport vezető:</b><input name="teamLeader" autocomplete="name" required></label>
+        <label class="date"><b>Dátum:</b><span class="date-control"><input name="date" type="text" inputmode="numeric" placeholder="2026. 08. 15." aria-label="Dátum magyar formátumban" required><button id="datePickerButton" type="button">📅 Választás</button></span></label>
+        <label class="wide"><b>Ügyfél neve:</b><input name="customerName" autocomplete="organization" required></label>
+        <label class="wide"><b>Cím:</b><input name="address" autocomplete="street-address" required></label>
+      </section>
+
+      <section class="worktime">
+        <h2>Munkaidő</h2>
+        <div id="teams"></div>
+        <div class="time-row">
+          <label><span>Alvállalkozó:</span><input name="subcontractor"></label>
+          <label><span>Érkezés:</span><input name="subcontractorArrival" type="time"></label>
+          <label><span>Távozás:</span><input name="subcontractorDeparture" type="time"></label>
+        </div>
+        <div class="rental-row">
+          <label><span>Gépbérlés1:</span><input name="rental1"></label>
+          <label><span>Gépbérlés2:</span><input name="rental2"></label>
+          <label><span>Gépbérlés3:</span><input name="rental3"></label>
+        </div>
+      </section>
+
+      <label class="description"><b>Feladat leírás /megjegyzés:</b><textarea name="description" rows="2" required></textarea></label>
+
+      <section class="materials-section">
+        <h2>Anyag és fuvar</h2>
+        <div class="material-columns">
+          <div class="material-group"><h3>Kertkarbantartás</h3><div id="maintenanceItems"></div></div>
+          <div class="material-group"><h3>Kertépítés / fuvarozás</h3><div id="constructionItems"></div></div>
+        </div>
+      </section>
+
+      <div id="status" class="status" role="status" aria-live="polite"></div>
+      <div class="actions">
+        <button class="submit-button" type="submit">Munkalap elküldése</button>
+        <button class="clear-button" id="clearForm" type="button">Munkalap törlése</button>
+      </div>
+      <p class="send-note">A beküldő neve a „Csoport vezető” mezőből kerül az e-mail tárgyába.</p>
+    </form>
+    <footer class="company-footer">
+      <img src="icon.svg" alt="" aria-hidden="true">
+      <div><b>Netteszt Kft</b><span>Adószám: 12437164-2-13</span><span>www.diszkertek.hu · 0670 634 9630</span><span>info@diszkertek.hu</span></div>
+      <small>Copyright © 2026 by Malárik Tamás · Minden jog fenntartva</small>
+    </footer>
+  </main>
+  <dialog id="dateDialog" class="date-dialog"><h2>Dátum kiválasztása</h2><div class="date-selects"><label>Év<select id="dateYear"></select></label><label>Hónap<select id="dateMonth"></select></label><label>Nap<select id="dateDay"></select></label></div><div class="dialog-actions"><button id="dateCancel" class="secondary" type="button">Mégse</button><button id="dateApply" type="button">Dátum beírása</button></div></dialog>
+  <dialog id="successDialog"><h2>Köszönöm, hogy beküldted a Munkalapot 😊</h2><p>Nagyon Cuki vagy ❤️</p><button id="newWorksheet" type="button">Új munkalap</button></dialog>
+  <script src="app.js?v=1"></script>
+</body>
+</html>

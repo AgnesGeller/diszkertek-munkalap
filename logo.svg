@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 270" role="img" aria-labelledby="title">
+  <title id="title">Díszkertek</title>
+  <g transform="translate(245 4)">
+    <path d="M118 177c-18-25-13-54 2-81 8-14 11-31 10-51 17 25 24 48 14 75 19-19 31-44 34-72 13 38 3 73-27 105 21-8 39-22 56-43-8 35-33 61-74 77z" fill="#6f5529"/>
+    <path d="M88 191c43-13 90-12 132 1-42 9-88 10-132-1z" fill="#6f5529"/>
+    <g fill="#2d7135">
+      <ellipse cx="84" cy="73" rx="29" ry="16" transform="rotate(32 84 73)"/><ellipse cx="120" cy="39" rx="29" ry="16" transform="rotate(76 120 39)"/>
+      <ellipse cx="163" cy="43" rx="29" ry="16" transform="rotate(113 163 43)"/><ellipse cx="202" cy="76" rx="31" ry="17" transform="rotate(146 202 76)"/>
+      <ellipse cx="65" cy="116" rx="30" ry="16" transform="rotate(8 65 116)"/><ellipse cx="215" cy="122" rx="31" ry="16" transform="rotate(174 215 122)"/>
+      <ellipse cx="101" cy="112" rx="28" ry="15" transform="rotate(55 101 112)"/><ellipse cx="175" cy="112" rx="28" ry="15" transform="rotate(125 175 112)"/>
+      <ellipse cx="139" cy="80" rx="30" ry="16" transform="rotate(90 139 80)"/>
+    </g>
+  </g>
+  <text x="360" y="252" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="72" font-weight="600" fill="#2d7135">Díszkertek</text>
+</svg>
