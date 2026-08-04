@@ -19,3 +19,5 @@ Az elküldés az aktivált FormSubmit végponton keresztül az `info@diszkertek.
 Az alkalmazás nem tárolja és nem tölti vissza az előző munkalapot. Újranyitáskor minden mező üres, csak az aktuális dátum jelenik meg. A böngésző saját név-, ügyfél- és címjavaslatai használhatók.
 
 A projekt nem használ Netlify-t. A statikus alkalmazást a GitHub Pages szolgálja ki, az e-mail-küldés közvetlenül a FormSubmit végpontjára történik.
+
+A letöltött `index.html` fájl közvetlen megnyitása automatikusan átirányít a működő GitHub Pages alkalmazásra, mert a FormSubmit `file://` oldalról nem enged e-mailt küldeni.

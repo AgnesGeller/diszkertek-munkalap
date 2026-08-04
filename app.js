@@ -2,6 +2,10 @@ const EMAIL_ENDPOINT = "https://formsubmit.co/ajax/info@diszkertek.hu";
 const STABLE_FORM_URL = "https://agnesgeller.github.io/diszkertek-munkalap/";
 const LEGACY_STORAGE_KEY = "diszkertek-munkalap-exact-v2";
 
+if (window.location.protocol === "file:") {
+  window.location.replace(STABLE_FORM_URL);
+}
+
 const MAINTENANCE = [
   ["Zöldhulladék elszállítás ömlesztett", "m³"], ["Zöldhulladék normál zsákos", "db"],
   ["Zöldhulladék big bag zsákos", "db"], ["Növényvédelem", "15L/tartály"],
@@ -139,6 +143,6 @@ document.querySelector("#clearForm").onclick=()=>{if(confirm("Biztosan törlöd 
 document.querySelector("#newWorksheet").onclick=()=>{document.querySelector("#successDialog").close();resetForm();window.scrollTo({top:0,behavior:"smooth"});};
 window.addEventListener("beforeinstallprompt",event=>{event.preventDefault();installPrompt=event;document.querySelector("#installButton").hidden=false;});
 document.querySelector("#installButton").onclick=async()=>{if(!installPrompt)return;installPrompt.prompt();await installPrompt.userChoice;installPrompt=null;document.querySelector("#installButton").hidden=true;};
-if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("service-worker.js?v=1"));
+if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("service-worker.js?v=2"));
 window.addEventListener("pageshow",clearRestoredBrowserValues);
 renderTeams();renderItems("maintenanceItems","maintenance",MAINTENANCE);renderItems("constructionItems","construction",CONSTRUCTION);resetForm();
