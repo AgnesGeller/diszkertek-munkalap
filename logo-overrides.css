@@ -1,0 +1,2 @@
+.brand-logo{width:min(330px,78vw);height:150px}
+@media(max-width:760px){.brand-logo{height:130px}}
