@@ -31,6 +31,9 @@ const CONSTRUCTION = [
 const form = document.querySelector("#worksheetForm");
 const statusBox = document.querySelector("#status");
 let installPrompt;
+let formDirty=false;
+let updateReloadPending=false;
+let serviceWorkerRegistration;
 
 function formatDateInput(date) {
   const year=date.getFullYear(),month=String(date.getMonth()+1).padStart(2,"0"),day=String(date.getDate()).padStart(2,"0");
@@ -56,7 +59,10 @@ function renderTeams() {
 }
 
 function renderItems(targetId, prefix, list) {
-  document.querySelector(`#${targetId}`).innerHTML = list.map(([name, unit], i) => `<label class="material-row"><span>${i+1}. ${name}${unit ? ` (${unit})` : ""}:</span><input name="${prefix}_${i}" inputmode="decimal" aria-label="${name}"></label>`).join("");
+  document.querySelector(`#${targetId}`).innerHTML = list.map(([name, unit], i) => {
+    const inputMode=name.startsWith("Egyéb")?"text":"decimal";
+    return `<label class="material-row"><span>${i+1}. ${name}${unit ? ` (${unit})` : ""}:</span><input name="${prefix}_${i}" inputmode="${inputMode}" aria-label="${name}"></label>`;
+  }).join("");
 }
 
 function dataObject() {
@@ -95,6 +101,7 @@ function buildFormSubmitPayload(data) {
 }
 function resetForm() {
   form.reset();
+  formDirty=false;
   form.elements.date.value=formatHungarianDateValue(formatDateInput(new Date()));
   try { localStorage.removeItem(LEGACY_STORAGE_KEY); } catch (_) {}
   statusBox.textContent="";
@@ -142,10 +149,32 @@ form.addEventListener("submit",async event=>{
   catch(error){showStatus(`A küldés nem sikerült: ${error?.message||"ismeretlen hiba"}. Az aktuális oldalon maradnak az adatok, hogy újra megpróbálhasd; újranyitáskor törlődnek.`);}
   finally{button.disabled=false;button.textContent="Munkalap elküldése";}
 });
-document.querySelector("#clearForm").onclick=()=>{if(confirm("Biztosan törlöd a teljes munkalapot?"))resetForm();};
-document.querySelector("#newWorksheet").onclick=()=>{document.querySelector("#successDialog").close();resetForm();window.scrollTo({top:0,behavior:"smooth"});};
+document.querySelector("#clearForm").onclick=()=>{if(confirm("Biztosan törlöd a teljes munkalapot?")){resetForm();if(updateReloadPending)window.location.reload();}};
+document.querySelector("#newWorksheet").onclick=()=>{document.querySelector("#successDialog").close();resetForm();if(updateReloadPending){window.location.reload();return;}window.scrollTo({top:0,behavior:"smooth"});};
 window.addEventListener("beforeinstallprompt",event=>{event.preventDefault();installPrompt=event;document.querySelector("#installButton").hidden=false;});
 document.querySelector("#installButton").onclick=async()=>{if(!installPrompt)return;installPrompt.prompt();await installPrompt.userChoice;installPrompt=null;document.querySelector("#installButton").hidden=true;};
-if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("service-worker.js?v=4"));
+if("serviceWorker" in navigator){
+  let updateReloadStarted=false;
+  navigator.serviceWorker.addEventListener("controllerchange",()=>{
+    if(updateReloadStarted)return;
+    if(formDirty){updateReloadPending=true;return;}
+    updateReloadStarted=true;
+    window.location.reload();
+  });
+  navigator.serviceWorker.register("service-worker.js",{updateViaCache:"none"})
+    .then(registration=>{
+      serviceWorkerRegistration=registration;
+      return registration.update();
+    })
+    .catch(()=>{});
+  const checkForUpdate=()=>serviceWorkerRegistration?.update().catch(()=>{});
+  window.addEventListener("online",checkForUpdate);
+  document.addEventListener("visibilitychange",()=>{
+    if(document.visibilityState!=="visible")return;
+    if(updateReloadPending&&!formDirty){window.location.reload();return;}
+    checkForUpdate();
+  });
+}
 window.addEventListener("pageshow",clearRestoredBrowserValues);
 renderTeams();renderItems("maintenanceItems","maintenance",MAINTENANCE);renderItems("constructionItems","construction",CONSTRUCTION);resetForm();
+form.addEventListener("input",()=>{formDirty=true;});
