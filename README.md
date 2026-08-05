@@ -23,3 +23,5 @@ A projekt nem használ Netlify-t. A statikus alkalmazást a GitHub Pages szolgá
 A letöltött `index.html` fájl közvetlen megnyitása automatikusan átirányít a működő GitHub Pages alkalmazásra, mert a FormSubmit `file://` oldalról nem enged e-mailt küldeni.
 
 A fejléc, a lábléc, a böngészőikon és a telepített alkalmazás ikonja a Canva munkalapból kinyert eredeti Díszkertek-logót használja.
+
+Az e-mail tárgya: `CSOPORTVEZETŐ NEVE - ÉÉÉÉ.HH.NN - MUNKALAP`.

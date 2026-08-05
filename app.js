@@ -47,6 +47,9 @@ function formatHungarianDateValue(value) {
   const iso=toDateInputValue(value).match(/^(\d{4})-(\d{2})-(\d{2})$/);
   return iso?`${iso[1]}. ${iso[2]}. ${iso[3]}.`:String(value||"");
 }
+function formatSubjectDate(value) {
+  return formatHungarianDateValue(value).replace(/\s/g,"").replace(/\.$/,"");
+}
 
 function renderTeams() {
   document.querySelector("#teams").innerHTML = [1,2,3].map(i => `<div class="time-row team-row"><label><span>Csapat ${i}:</span><input name="team_${i}_size" inputmode="numeric"><em>fő</em></label><label><span>Érkezés:</span><input name="team_${i}_arrival" type="time"></label><label><span>Távozás:</span><input name="team_${i}_departure" type="time"></label></div>`).join("");
@@ -66,7 +69,7 @@ function addIfFilled(payload,label,value,suffix="") {
 }
 function buildFormSubmitPayload(data) {
   const payload={
-    _subject:`DÍSZKERTEK MUNKALAP – ${data.teamLeader} – ${formatHungarianDateValue(data.date)}`,
+    _subject:`${String(data.teamLeader||"").trim().toLocaleUpperCase("hu-HU")} - ${formatSubjectDate(data.date)} - MUNKALAP`,
     _template:"table",
     _captcha:"false",
     _url:STABLE_FORM_URL,
@@ -143,6 +146,6 @@ document.querySelector("#clearForm").onclick=()=>{if(confirm("Biztosan törlöd 
 document.querySelector("#newWorksheet").onclick=()=>{document.querySelector("#successDialog").close();resetForm();window.scrollTo({top:0,behavior:"smooth"});};
 window.addEventListener("beforeinstallprompt",event=>{event.preventDefault();installPrompt=event;document.querySelector("#installButton").hidden=false;});
 document.querySelector("#installButton").onclick=async()=>{if(!installPrompt)return;installPrompt.prompt();await installPrompt.userChoice;installPrompt=null;document.querySelector("#installButton").hidden=true;};
-if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("service-worker.js?v=2"));
+if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("service-worker.js?v=4"));
 window.addEventListener("pageshow",clearRestoredBrowserValues);
 renderTeams();renderItems("maintenanceItems","maintenance",MAINTENANCE);renderItems("constructionItems","construction",CONSTRUCTION);resetForm();
