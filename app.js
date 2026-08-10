@@ -151,8 +151,26 @@ form.addEventListener("submit",async event=>{
 });
 document.querySelector("#clearForm").onclick=()=>{if(confirm("Biztosan törlöd a teljes munkalapot?")){resetForm();if(updateReloadPending)window.location.reload();}};
 document.querySelector("#newWorksheet").onclick=()=>{document.querySelector("#successDialog").close();resetForm();if(updateReloadPending){window.location.reload();return;}window.scrollTo({top:0,behavior:"smooth"});};
-window.addEventListener("beforeinstallprompt",event=>{event.preventDefault();installPrompt=event;document.querySelector("#installButton").hidden=false;});
-document.querySelector("#installButton").onclick=async()=>{if(!installPrompt)return;installPrompt.prompt();await installPrompt.userChoice;installPrompt=null;document.querySelector("#installButton").hidden=true;};
+const installButton=document.querySelector("#installButton");
+const installDialog=document.querySelector("#installDialog");
+const installDialogTitle=document.querySelector("#installDialogTitle");
+const installDialogText=document.querySelector("#installDialogText");
+const isInstalled=()=>window.matchMedia("(display-mode: standalone)").matches||window.navigator.standalone===true;
+function showInstallMessage(title,message){installDialogTitle.textContent=title;installDialogText.textContent=message;installDialog.showModal();}
+window.addEventListener("beforeinstallprompt",event=>{event.preventDefault();installPrompt=event;});
+window.addEventListener("appinstalled",()=>{installPrompt=null;showInstallMessage("Sikeres telepítés","A Munkalap alkalmazás telepítve van a telefonodra.");});
+document.querySelector("#installDialogClose").onclick=()=>installDialog.close();
+installButton.onclick=async()=>{
+  if(isInstalled()){showInstallMessage("Már telepítve van","A Munkalap alkalmazás már telepítve van ezen a telefonon.");return;}
+  if(installPrompt){
+    installPrompt.prompt();
+    const choice=await installPrompt.userChoice;
+    installPrompt=null;
+    return;
+  }
+  const isIos=/iphone|ipad|ipod/i.test(navigator.userAgent);
+  showInstallMessage("Munkalap telepítése",isIos?"Nyomd meg a böngésző Megosztás gombját, majd válaszd a Főképernyőhöz adás lehetőséget.":"Nyisd meg a böngésző menüjét, majd válaszd az Alkalmazás telepítése vagy a Főképernyőhöz adás lehetőséget.");
+};
 if("serviceWorker" in navigator){
   let updateReloadStarted=false;
   navigator.serviceWorker.addEventListener("controllerchange",()=>{
