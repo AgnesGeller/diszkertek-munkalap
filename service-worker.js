@@ -1,6 +1,6 @@
-const CACHE="diszkertek-onallo-munkalap-v8";
-const OFFLINE_PAGE="./index.html?v=8";
-const ASSETS=[OFFLINE_PAGE,"./styles.css","./logo-overrides.css","./app.js?v=8","./manifest.webmanifest","./official-logo.png","./official-emblem.png","./botanical.svg","./official-icon-192.png","./official-icon-512.png","./apple-touch-icon-official.png"];
+const CACHE="diszkertek-onallo-munkalap-v9";
+const OFFLINE_PAGE="./index.html?v=9";
+const ASSETS=[OFFLINE_PAGE,"./styles.css","./logo-overrides.css","./app.js?v=9","./manifest.webmanifest","./official-logo.png","./official-emblem.png","./botanical.svg","./official-icon-192.png","./official-icon-512.png","./apple-touch-icon-official.png"];
 self.addEventListener("install",event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting())));
 self.addEventListener("activate",event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
 self.addEventListener("fetch",event=>{
