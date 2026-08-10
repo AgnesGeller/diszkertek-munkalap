@@ -15,7 +15,7 @@ const MAINTENANCE = [
   ["Marhatrágya", "20L/zsák"], ["Marhatrágya", "40/50L/zsák"],
   ["Termőföld zsákos", "20L/zsák"], ["Termőföld zsákos", "40/50L/zsák"],
   ["Karó cserjének", "db"], ["Karó fának", "db"], ["Geotextília", "m2"], ["Fatörzsvédő", "db"],
-  ["Öntözőrendszer anyagok", ""], ["Fatörzsvédő", "db"], ["Öntözőrendszer anyagok", ""]
+  ["Öntözőrendszer anyagok", ""], ["Egyéb1", ""], ["Egyéb2", ""]
 ];
 
 const CONSTRUCTION = [
@@ -60,7 +60,7 @@ function renderTeams() {
 
 function renderItems(targetId, prefix, list) {
   document.querySelector(`#${targetId}`).innerHTML = list.map(([name, unit], i) => {
-    const inputMode=name.startsWith("Egyéb")?"text":"decimal";
+    const inputMode=name.startsWith("Egyéb")||name==="Öntözőrendszer anyagok"?"text":"decimal";
     return `<label class="material-row"><span>${i+1}. ${name}${unit ? ` (${unit})` : ""}:</span><input name="${prefix}_${i}" inputmode="${inputMode}" aria-label="${name}"></label>`;
   }).join("");
 }
