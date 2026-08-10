@@ -1,4 +1,5 @@
 const EMAIL_ENDPOINT = "https://formsubmit.co/ajax/info@diszkertek.hu";
+const EMAIL_RECIPIENT = "info@diszkertek.hu";
 const STABLE_FORM_URL = "https://agnesgeller.github.io/diszkertek-munkalap/";
 const LEGACY_STORAGE_KEY = "diszkertek-munkalap-exact-v2";
 
@@ -30,10 +31,13 @@ const CONSTRUCTION = [
 
 const form = document.querySelector("#worksheetForm");
 const statusBox = document.querySelector("#status");
+const fallbackEmailButton = document.querySelector("#fallbackEmailButton");
 let installPrompt;
 let formDirty=false;
 let updateReloadPending=false;
 let serviceWorkerRegistration;
+let fallbackEmailPayload=null;
+let externalEmailInProgress=false;
 
 function formatDateInput(date) {
   const year=date.getFullYear(),month=String(date.getMonth()+1).padStart(2,"0"),day=String(date.getDate()).padStart(2,"0");
@@ -99,15 +103,23 @@ function buildFormSubmitPayload(data) {
   CONSTRUCTION.forEach(([name,unit],i)=>addIfFilled(payload,`Kertépítés / fuvarozás ${i+1}. – ${name}${unit?` (${unit})`:""}`,data[`construction_${i}`]));
   return payload;
 }
+function fallbackEmailUrl(payload) {
+  const subject=String(payload?._subject||"MUNKALAP");
+  const body=["MUNKALAP","",...Object.entries(payload||{}).filter(([name,value])=>!name.startsWith("_")&&String(value||"").trim()).map(([name,value])=>`${name}: ${value}`)].join("\n");
+  return `mailto:${EMAIL_RECIPIENT}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
 function resetForm() {
   form.reset();
   formDirty=false;
+  fallbackEmailPayload=null;
+  fallbackEmailButton.hidden=true;
   form.elements.date.value=formatHungarianDateValue(formatDateInput(new Date()));
   try { localStorage.removeItem(LEGACY_STORAGE_KEY); } catch (_) {}
   statusBox.textContent="";
   statusBox.className="status";
 }
 function clearRestoredBrowserValues() {
+  if(externalEmailInProgress){externalEmailInProgress=false;return;}
   resetForm();
   requestAnimationFrame(()=>resetForm());
 }
@@ -144,11 +156,17 @@ dateField.addEventListener("blur",()=>{
 });
 form.addEventListener("submit",async event=>{
   event.preventDefault(); if(!form.reportValidity())return; if(!navigator.onLine){showStatus("Nincs internetkapcsolat. Az adatokat nem küldtük el; maradj ezen az oldalon, majd próbáld újra.");return;}
-  const data=dataObject(),button=form.querySelector(".submit-button"); button.disabled=true;button.textContent="Küldés folyamatban…";
-  try { const response=await fetch(EMAIL_ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json","Accept":"application/json"},body:JSON.stringify(buildFormSubmitPayload(data))}); const result=await response.json().catch(()=>({})); const explicitlyFailed=result.success===false||String(result.success).toLowerCase()==="false"; if(!response.ok||explicitlyFailed)throw new Error(result.message||`Küldési hiba (${response.status})`); resetForm();document.querySelector("#successDialog").showModal(); }
-  catch(error){showStatus(`A küldés nem sikerült: ${error?.message||"ismeretlen hiba"}. Az aktuális oldalon maradnak az adatok, hogy újra megpróbálhasd; újranyitáskor törlődnek.`);}
+  const data=dataObject(),payload=buildFormSubmitPayload(data),button=form.querySelector(".submit-button");
+  fallbackEmailPayload=payload;fallbackEmailButton.hidden=true;button.disabled=true;button.textContent="Küldés folyamatban…";
+  try { const response=await fetch(EMAIL_ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json","Accept":"application/json"},body:JSON.stringify(payload)}); const result=await response.json().catch(()=>({})); const explicitlyFailed=result.success===false||String(result.success).toLowerCase()==="false"; if(!response.ok||explicitlyFailed)throw new Error(result.message||`Küldési hiba (${response.status})`); resetForm();document.querySelector("#successDialog").showModal(); }
+  catch(error){fallbackEmailButton.hidden=false;showStatus(`A közvetlen küldés nem sikerült: ${error?.message||"ismeretlen hiba"}. Nyomd meg a „Küldés e-mail alkalmazással” gombot, majd az e-mailben a Küldés gombot.`);}
   finally{button.disabled=false;button.textContent="Munkalap elküldése";}
 });
+fallbackEmailButton.onclick=()=>{
+  if(!fallbackEmailPayload)return;
+  externalEmailInProgress=true;
+  window.location.href=fallbackEmailUrl(fallbackEmailPayload);
+};
 document.querySelector("#clearForm").onclick=()=>{if(confirm("Biztosan törlöd a teljes munkalapot?")){resetForm();if(updateReloadPending)window.location.reload();}};
 document.querySelector("#newWorksheet").onclick=()=>{document.querySelector("#successDialog").close();resetForm();if(updateReloadPending){window.location.reload();return;}window.scrollTo({top:0,behavior:"smooth"});};
 const installButton=document.querySelector("#installButton");

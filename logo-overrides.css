@@ -2,4 +2,6 @@
 .header-actions{position:absolute;right:54px;top:24px;display:flex;gap:8px}
 .header-actions button{border:1px solid var(--green);padding:9px 13px;border-radius:999px;color:var(--green);background:rgba(255,255,255,.9);font:bold 13px Arial,sans-serif;box-shadow:0 3px 10px rgba(49,95,55,.1);cursor:pointer}
 .header-actions button:disabled{opacity:.6}
+.fallback-email-button{display:block;margin:12px auto 0;border:1px solid var(--brown);border-radius:999px;padding:13px 18px;color:#fff;background:var(--brown);font:bold 14px Arial,sans-serif;cursor:pointer}
+.fallback-email-button[hidden]{display:none}
 @media(max-width:760px){.brand-logo{height:130px}.header-actions{position:static;justify-content:center;margin:9px 0 0}.header-actions button{margin:0}}
