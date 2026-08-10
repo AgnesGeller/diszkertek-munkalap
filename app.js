@@ -171,6 +171,20 @@ installButton.onclick=async()=>{
   const isIos=/iphone|ipad|ipod/i.test(navigator.userAgent);
   showInstallMessage("Munkalap telepítése",isIos?"Nyomd meg a böngésző Megosztás gombját, majd válaszd a Főképernyőhöz adás lehetőséget.":"Nyisd meg a böngésző menüjét, majd válaszd az Alkalmazás telepítése vagy a Főképernyőhöz adás lehetőséget.");
 };
+const refreshButton=document.querySelector("#refreshButton");
+refreshButton.onclick=async()=>{
+  if(!navigator.onLine){showInstallMessage("Nincs internetkapcsolat","A frissítéshez internetkapcsolat szükséges.");return;}
+  if(formDirty&&!confirm("A frissítés törli a most beírt adatokat. Biztosan frissíted az alkalmazást?"))return;
+  refreshButton.disabled=true;
+  refreshButton.textContent="Frissítés…";
+  try{
+    const registration=serviceWorkerRegistration||await navigator.serviceWorker?.getRegistration();
+    await registration?.update();
+  }catch(_){}
+  const refreshUrl=new URL(STABLE_FORM_URL);
+  refreshUrl.searchParams.set("refresh",Date.now().toString());
+  window.location.replace(refreshUrl.toString());
+};
 if("serviceWorker" in navigator){
   let updateReloadStarted=false;
   navigator.serviceWorker.addEventListener("controllerchange",()=>{
