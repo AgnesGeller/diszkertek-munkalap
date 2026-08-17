@@ -9,8 +9,8 @@
   "background_color": "#e8f0ec",
   "theme_color": "#315f37",
   "icons": [
-    {"src":"diszkertek-logo-192-v11.png","sizes":"192x192","type":"image/png","purpose":"any"},
-    {"src":"diszkertek-logo-512-v11.png","sizes":"512x512","type":"image/png","purpose":"any"},
-    {"src":"diszkertek-logo-maskable-512-v11.png","sizes":"512x512","type":"image/png","purpose":"maskable"}
+    {"src":"munkalap-m-icon-192-v12.png","sizes":"192x192","type":"image/png","purpose":"any"},
+    {"src":"munkalap-m-icon-512-v12.png","sizes":"512x512","type":"image/png","purpose":"any"},
+    {"src":"munkalap-m-icon-maskable-512-v12.png","sizes":"512x512","type":"image/png","purpose":"maskable"}
   ]
 }
