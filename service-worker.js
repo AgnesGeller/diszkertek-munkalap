@@ -1,6 +1,6 @@
-const CACHE="diszkertek-onallo-munkalap-v10";
-const OFFLINE_PAGE="./index.html?v=10";
-const ASSETS=[OFFLINE_PAGE,"./styles.css","./logo-overrides.css","./app.js?v=10","./manifest.webmanifest","./official-logo.png","./official-emblem.png","./botanical.svg","./official-icon-192.png","./official-icon-512.png","./apple-touch-icon-official.png"];
+const CACHE="diszkertek-onallo-munkalap-v11";
+const OFFLINE_PAGE="./index.html?v=11";
+const ASSETS=[OFFLINE_PAGE,"./styles.css","./logo-overrides.css","./app.js?v=10","./manifest.webmanifest?v=11","./official-logo.png","./official-emblem.png","./botanical.svg","./official-icon-192.png","./diszkertek-logo-32-v11.png","./diszkertek-logo-192-v11.png","./diszkertek-logo-512-v11.png","./diszkertek-logo-maskable-512-v11.png","./diszkertek-logo-apple-180-v11.png","./favicon-v11.ico"];
 self.addEventListener("install",event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting())));
 self.addEventListener("activate",event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
 self.addEventListener("fetch",event=>{
