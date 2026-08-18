@@ -3,79 +3,159 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#ffffff">
+  <meta name="theme-color" content="#315f37">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Munkalap">
-  <link rel="manifest" href="manifest.webmanifest?v=12">
+  <link rel="manifest" href="manifest.webmanifest?v=14">
   <link rel="icon" href="munkalap-m-favicon-v12.ico" sizes="any">
   <link rel="icon" href="munkalap-m-icon-32-v12.png" type="image/png" sizes="32x32">
   <link rel="apple-touch-icon" href="munkalap-m-icon-apple-180-v12.png">
-  <link rel="stylesheet" href="styles.css">
-  <link rel="stylesheet" href="logo-overrides.css">
-  <title>Díszkertek - Napi munkalap</title>
+  <link rel="stylesheet" href="styles.css?v=14">
+  <link rel="stylesheet" href="logo-overrides.css?v=14">
+  <link rel="stylesheet" href="app-shell.css?v=14">
+  <title>Díszkertek – Napi munkalap</title>
 </head>
 <body>
-  <main class="sheet">
+  <main id="loginView" class="login-view">
+    <section class="login-card">
+      <img class="login-logo" src="official-logo.png" alt="Díszkertek">
+      <h1>NAPI MUNKALAP</h1>
+      <p>Válaszd ki a neved.</p>
+      <label class="profile-select-wrap" for="profileSelect">
+        <span>Csoportvezető</span>
+        <select id="profileSelect" aria-label="Csoportvezető kiválasztása">
+          <option value="">Válassz nevet…</option>
+        </select>
+      </label>
+      <label id="pinFieldWrap" class="pin-field" hidden>
+        <span>PIN-kód</span>
+        <input id="pinField" type="password" inputmode="numeric" autocomplete="current-password" minlength="6" placeholder="Legalább 6 számjegy">
+      </label>
+      <button id="enterButton" class="primary-button" type="button" disabled>Belépés</button>
+      <p id="loginStatus" class="login-status" role="status" aria-live="polite"></p>
+      <small>A PIN-kódot csak az első belépéskor kell megadni ezen a telefonon.</small>
+    </section>
+  </main>
+
+  <main id="appView" class="sheet" hidden>
+    <div id="previewBanner" class="preview-banner" hidden>HELYI BEMUTATÓ – az itt végzett műveletek nem kerülnek az adatbázisba, és e-mail sem lesz elküldve.</div>
     <header class="sheet-header">
       <img class="brand-logo" src="official-logo.png" alt="Díszkertek">
       <p class="kicker">Kertfenntartási munkák nyilvántartása</p>
       <h1>NAPI MUNKALAP</h1>
       <p class="year">2026</p>
+      <p id="activeUser" class="active-user"></p>
       <div class="header-actions">
         <button id="installButton" type="button">Telepítés</button>
         <button id="refreshButton" type="button">Frissítés</button>
+        <button id="logoutButton" type="button">Kijelentkezés</button>
       </div>
     </header>
 
-    <form id="worksheetForm">
-      <section class="identity">
-        <label class="leader"><b>Csoport vezető:</b><input name="teamLeader" autocomplete="name" required></label>
-        <label class="date"><b>Dátum:</b><span class="date-control"><input name="date" type="text" inputmode="numeric" placeholder="2026. 08. 15." aria-label="Dátum magyar formátumban" required><button id="datePickerButton" type="button">📅 Választás</button></span></label>
-        <label class="wide"><b>Ügyfél neve:</b><input name="customerName" autocomplete="organization" required></label>
-        <label class="wide"><b>Cím:</b><input name="address" autocomplete="street-address" required></label>
-      </section>
+    <nav id="managerTabs" class="manager-tabs" hidden aria-label="Iroda vagy napi munkalap">
+      <button id="officeTab" type="button">IRODA</button>
+      <button id="worksheetTab" type="button">NAPI MUNKALAP</button>
+    </nav>
 
-      <section class="worktime">
-        <h2>Munkaidő</h2>
-        <div id="teams"></div>
-        <div class="time-row">
-          <label><span>Alvállalkozó:</span><input name="subcontractor"></label>
-          <label><span>Érkezés:</span><input name="subcontractorArrival" type="time"></label>
-          <label><span>Távozás:</span><input name="subcontractorDeparture" type="time"></label>
+    <section id="worksheetView">
+      <div id="queueNotice" class="queue-notice" hidden role="status"></div>
+      <form id="worksheetForm" autocomplete="off">
+        <section class="identity">
+          <label class="leader"><b>Csoport vezető:</b><input name="teamLeader" readonly required></label>
+          <label class="date"><b>Dátum:</b><span class="date-control"><input name="date" type="text" inputmode="numeric" placeholder="2026. 08. 15." aria-label="Dátum magyar formátumban" required><button id="datePickerButton" type="button">📅 Választás</button></span></label>
+          <label class="wide"><b>Ügyfél neve:</b><input name="customerName" list="customerSuggestions" autocomplete="off" required></label>
+          <label class="wide"><b>Cím:</b><input name="address" list="addressSuggestions" autocomplete="off" required></label>
+          <datalist id="customerSuggestions"></datalist>
+          <datalist id="addressSuggestions"></datalist>
+        </section>
+
+        <section class="worktime">
+          <h2>Munkaidő</h2>
+          <div id="teams"></div>
+          <div class="time-row">
+            <label><span>Alvállalkozó:</span><input name="subcontractor"></label>
+            <label><span>Érkezés:</span><input name="subcontractorArrival" type="time"></label>
+            <label><span>Távozás:</span><input name="subcontractorDeparture" type="time"></label>
+          </div>
+          <div class="rental-row">
+            <label><span>Gépbérlés1:</span><input name="rental1"></label>
+            <label><span>Gépbérlés2:</span><input name="rental2"></label>
+            <label><span>Gépbérlés3:</span><input name="rental3"></label>
+          </div>
+        </section>
+
+        <label class="description"><b>Feladat leírás / megjegyzés:</b><textarea name="description" rows="2" required></textarea></label>
+
+        <section class="materials-section">
+          <h2>Anyag és fuvar</h2>
+          <div class="material-columns">
+            <div class="material-group"><h3>Kertkarbantartás</h3><div id="maintenanceItems"></div></div>
+            <div class="material-group"><h3>Kertépítés / fuvarozás</h3><div id="constructionItems"></div></div>
+          </div>
+        </section>
+
+        <div id="status" class="status" role="status" aria-live="polite"></div>
+        <button id="fallbackEmailButton" class="fallback-email-button" type="button" hidden>Küldés e-mail alkalmazással</button>
+        <div class="actions">
+          <button class="submit-button" type="submit">Munkalap elküldése</button>
+          <button class="clear-button" id="clearForm" type="button">Munkalap törlése</button>
+          <button class="clear-button" id="cancelEdit" type="button" hidden>Szerkesztés megszakítása</button>
         </div>
-        <div class="rental-row">
-          <label><span>Gépbérlés1:</span><input name="rental1"></label>
-          <label><span>Gépbérlés2:</span><input name="rental2"></label>
-          <label><span>Gépbérlés3:</span><input name="rental3"></label>
+      </form>
+
+      <section class="history-section" aria-labelledby="historyTitle">
+        <div class="section-heading">
+          <h2 id="historyTitle">Munkalapjaim</h2>
+          <button id="reloadHistory" class="small-button" type="button">Frissítés</button>
         </div>
+        <div id="recentWorksheets" class="worksheet-list"></div>
       </section>
+    </section>
 
-      <label class="description"><b>Feladat leírás /megjegyzés:</b><textarea name="description" rows="2" required></textarea></label>
-
-      <section class="materials-section">
-        <h2>Anyag és fuvar</h2>
-        <div class="material-columns">
-          <div class="material-group"><h3>Kertkarbantartás</h3><div id="maintenanceItems"></div></div>
-          <div class="material-group"><h3>Kertépítés / fuvarozás</h3><div id="constructionItems"></div></div>
-        </div>
-      </section>
-
-      <div id="status" class="status" role="status" aria-live="polite"></div>
-      <button id="fallbackEmailButton" class="fallback-email-button" type="button" hidden>Küldés e-mail alkalmazással</button>
-      <div class="actions">
-        <button class="submit-button" type="submit">Munkalap elküldése</button>
-        <button class="clear-button" id="clearForm" type="button">Munkalap törlése</button>
+    <section id="officeView" class="office-view" hidden>
+      <div id="archiveReminder" class="archive-reminder" hidden>
+        <b>Éves archiválás</b>
+        <span>December 10. után érdemes az előző év munkalapjait Excelbe és PDF-be lementeni.</span>
       </div>
-    </form>
+
+      <section class="database-usage">
+        <div><b>Adatbázis telítettsége</b><span id="databaseUsageText">Betöltés…</span></div>
+        <div class="usage-track"><span id="databaseUsageBar"></span></div>
+      </section>
+
+      <section class="office-filters">
+        <label>Csoportvezető<select id="filterLeader"><option value="">Mind</option></select></label>
+        <label>Ügyfél<input id="filterCustomer" type="search" autocomplete="off"></label>
+        <label>Cím<input id="filterAddress" type="search" autocomplete="off"></label>
+        <label>Dátumtól<input id="filterFrom" type="date"></label>
+        <label>Dátumig<input id="filterTo" type="date"></label>
+        <button id="clearFilters" class="small-button" type="button">Szűrés törlése</button>
+      </section>
+
+      <div class="office-actions">
+        <button id="exportExcel" class="primary-button" type="button">Excel letöltése</button>
+        <button id="exportPdf" class="secondary-button" type="button">Szűrt lista PDF</button>
+      </div>
+      <p id="officeCount" class="office-count"></p>
+      <div id="officeWorksheets" class="worksheet-list office-list"></div>
+    </section>
+
     <footer class="company-footer">
       <img src="official-icon-192.png" alt="" aria-hidden="true">
       <div><b>Netteszt Kft</b><span>Adószám: 12437164-2-13</span><span>www.diszkertek.hu · 0670 634 9630</span><span>info@diszkertek.hu</span></div>
       <small>Copyright © 2026 by Malárik Tamás · Minden jog fenntartva</small>
     </footer>
   </main>
+
+  <article id="printWorksheet" class="print-worksheet" hidden></article>
+
   <dialog id="dateDialog" class="date-dialog"><h2>Dátum kiválasztása</h2><div class="date-selects"><label>Év<select id="dateYear"></select></label><label>Hónap<select id="dateMonth"></select></label><label>Nap<select id="dateDay"></select></label></div><div class="dialog-actions"><button id="dateCancel" class="secondary" type="button">Mégse</button><button id="dateApply" type="button">Dátum beírása</button></div></dialog>
   <dialog id="installDialog" class="install-dialog"><h2 id="installDialogTitle">Munkalap telepítése</h2><p id="installDialogText"></p><button id="installDialogClose" type="button">Rendben</button></dialog>
   <dialog id="successDialog"><h2>Köszönöm, hogy beküldted a Munkalapot 😊</h2><p>Nagyon Cuki vagy ❤️</p><button id="newWorksheet" type="button">Új munkalap</button></dialog>
-  <script src="app.js?v=10"></script>
+
+  <script src="supabase.js?v=14"></script>
+  <script src="supabase-config.js?v=14"></script>
+  <script src="munkalap-data.js?v=14"></script>
+  <script src="app.js?v=14"></script>
 </body>
 </html>
