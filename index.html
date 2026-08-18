@@ -6,13 +6,13 @@
   <meta name="theme-color" content="#315f37">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Munkalap">
-  <link rel="manifest" href="manifest.webmanifest?v=16">
+  <link rel="manifest" href="manifest.webmanifest?v=17">
   <link rel="icon" href="munkalap-m-favicon-v12.ico" sizes="any">
   <link rel="icon" href="munkalap-m-icon-32-v12.png" type="image/png" sizes="32x32">
   <link rel="apple-touch-icon" href="munkalap-m-icon-apple-180-v12.png">
-  <link rel="stylesheet" href="styles.css?v=16">
-  <link rel="stylesheet" href="logo-overrides.css?v=16">
-  <link rel="stylesheet" href="app-shell.css?v=16">
+  <link rel="stylesheet" href="styles.css?v=17">
+  <link rel="stylesheet" href="logo-overrides.css?v=17">
+  <link rel="stylesheet" href="app-shell.css?v=17">
   <title>Díszkertek – Napi munkalap</title>
 </head>
 <body>
@@ -115,13 +115,20 @@
     <section id="officeView" class="office-view" hidden>
       <div id="archiveReminder" class="archive-reminder" hidden>
         <b>Éves archiválás</b>
-        <span>December 10. után érdemes az előző év munkalapjait Excelbe és PDF-be lementeni.</span>
+        <span>December 10. után érdemes az előző év munkalapjait Excelbe lementeni.</span>
       </div>
 
       <section class="database-usage">
         <div><b>Adatbázis telítettsége</b><span id="databaseUsageText">Betöltés…</span></div>
         <div class="usage-track"><span id="databaseUsageBar"></span></div>
       </section>
+
+      <nav class="office-week-navigation" aria-label="Heti munkalapok">
+        <button id="previousOfficeWeek" type="button" aria-label="Előző hét">‹</button>
+        <div class="office-week-period"><span>HETI NÉZET</span><b id="officeWeekLabel"></b></div>
+        <button id="nextOfficeWeek" type="button" aria-label="Következő hét">›</button>
+        <button id="showAllOfficeWeeks" class="small-button" type="button">Összes</button>
+      </nav>
 
       <section class="office-filters">
         <label>Csoportvezető<select id="filterLeader"><option value="">Mind</option></select></label>
@@ -133,9 +140,11 @@
       </section>
 
       <div class="office-actions">
-        <button id="exportExcel" class="primary-button" type="button">Excel letöltése</button>
+        <button id="exportExcel" class="primary-button" type="button">Szűrt lista Excel</button>
+        <button id="archivePreviousYear" class="secondary-button" type="button">Előző év Excel-archívuma</button>
         <button id="exportPdf" class="secondary-button" type="button">Szűrt lista PDF</button>
       </div>
+      <p id="officeStatus" class="office-status" role="status" aria-live="polite"></p>
       <p id="officeCount" class="office-count"></p>
       <div id="officeWorksheets" class="worksheet-list office-list"></div>
     </section>
@@ -153,9 +162,9 @@
   <dialog id="installDialog" class="install-dialog"><h2 id="installDialogTitle">Munkalap telepítése</h2><p id="installDialogText"></p><button id="installDialogClose" type="button">Rendben</button></dialog>
   <dialog id="successDialog"><h2>Köszönöm, hogy beküldted a Munkalapot 😊</h2><p>Nagyon Cuki vagy ❤️</p><button id="newWorksheet" type="button">Új munkalap</button></dialog>
 
-  <script src="supabase.js?v=16"></script>
-  <script src="supabase-config.js?v=16"></script>
-  <script src="munkalap-data.js?v=16"></script>
-  <script src="app.js?v=16"></script>
+  <script src="supabase.js?v=17"></script>
+  <script src="supabase-config.js?v=17"></script>
+  <script src="munkalap-data.js?v=17"></script>
+  <script src="app.js?v=17"></script>
 </body>
 </html>

@@ -1,7 +1,7 @@
 const EMAIL_ENDPOINT = "https://formsubmit.co/ajax/info@diszkertek.hu";
 const EMAIL_RECIPIENT = "info@diszkertek.hu";
 const STABLE_APP_URL = "https://agnesgeller.github.io/diszkertek-munkalap/";
-const APP_VERSION = "16";
+const APP_VERSION = "17";
 const QUEUE_KEY = "diszkertek-munkalap-send-queue-v1";
 const MANAGER_VIEW_KEY = "diszkertek-munkalap-manager-view-v1";
 const DATABASE_FREE_LIMIT = 500 * 1024 * 1024;
@@ -51,11 +51,54 @@ let pendingCurrentQueueId = null;
 let queueSyncRunning = false;
 let realtimeRefreshTimer = null;
 let officeViewActive = false;
+let officeLoaded = false;
+let officeLoading = false;
+let officeWeekStart = startOfOfficeWeek(new Date());
+let officeWeekActive = true;
 
 function escapeHTML(value) {
   return String(value ?? "").replace(/[&<>'"]/g, character => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;"
   })[character]);
+}
+
+function dateToISO(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function startOfOfficeWeek(value) {
+  const date = new Date(value);
+  date.setHours(12, 0, 0, 0);
+  date.setDate(date.getDate() - ((date.getDay() + 2) % 7));
+  return date;
+}
+
+function endOfOfficeWeek(start) {
+  const end = new Date(start);
+  end.setDate(end.getDate() + 6);
+  return end;
+}
+
+function shortHungarianDate(date) {
+  return date.toLocaleDateString("hu-HU", { year: "numeric", month: "2-digit", day: "2-digit" });
+}
+
+function applyOfficeWeek() {
+  const end = endOfOfficeWeek(officeWeekStart);
+  officeWeekActive = true;
+  $("#filterFrom").value = dateToISO(officeWeekStart);
+  $("#filterTo").value = dateToISO(end);
+  $("#officeWeekLabel").textContent = `${shortHungarianDate(officeWeekStart)} – ${shortHungarianDate(end)}`;
+  renderOffice();
+}
+
+function moveOfficeWeek(days) {
+  officeWeekStart = new Date(officeWeekStart);
+  officeWeekStart.setDate(officeWeekStart.getDate() + days);
+  applyOfficeWeek();
 }
 
 function uuid() {
@@ -487,6 +530,7 @@ function worksheetCardHTML(item, office = false) {
       <div class="card-actions">
         ${item.pending ? "" : `<button type="button" data-edit="${escapeHTML(item.id)}">Megnyitás / Szerkesztés</button>`}
         ${office ? `<button type="button" data-print="${escapeHTML(item.id)}">PDF / Nyomtatás</button>` : ""}
+        ${office && !item.pending ? `<button class="delete-button" type="button" data-delete="${escapeHTML(item.id)}">Törlés</button>` : ""}
       </div>
     </article>`;
 }
@@ -537,6 +581,12 @@ function renderOffice() {
   $("#officeWorksheets").innerHTML = filtered.length ? filtered.map(item => worksheetCardHTML(item, true)).join("") : `<p class="empty-list">Nincs a szűrésnek megfelelő munkalap.</p>`;
 }
 
+function showOfficeStatus(message = "", type = "") {
+  const target = $("#officeStatus");
+  target.textContent = message;
+  target.className = `office-status${type ? ` ${type}` : ""}`;
+}
+
 function updateSuggestions() {
   const customers = [...new Set(worksheets.map(item => item.customer).filter(Boolean))].sort((a, b) => a.localeCompare(b, "hu"));
   const addresses = [...new Set(worksheets.map(item => item.address).filter(Boolean))].sort((a, b) => a.localeCompare(b, "hu"));
@@ -578,7 +628,14 @@ async function loadDatabaseUsage() {
 async function loadWorksheets(showErrors = true) {
   if (!session) return;
   try {
-    worksheets = await MunkalapDB.list();
+    const recent = await MunkalapDB.listRecent();
+    if (officeLoaded) {
+      const byId = new Map(worksheets.map(item => [item.id, item]));
+      recent.forEach(item => byId.set(item.id, item));
+      worksheets = [...byId.values()];
+    } else {
+      worksheets = recent;
+    }
     renderAll();
     if (session.role === "manager") loadDatabaseUsage();
   } catch (error) {
@@ -587,6 +644,23 @@ async function loadWorksheets(showErrors = true) {
       notice.hidden = false;
       notice.textContent = `A munkalapok listája még nem érhető el: ${error.message}`;
     }
+  }
+}
+
+async function loadOfficeWorksheets(showErrors = true) {
+  if (session?.role !== "manager" || officeLoading) return;
+  officeLoading = true;
+  $("#officeCount").textContent = "Munkalapok betöltése…";
+  showOfficeStatus("A teljes lista betöltése több részletben történik.");
+  try {
+    worksheets = await MunkalapDB.listAll();
+    officeLoaded = true;
+    renderAll();
+    showOfficeStatus("A teljes irodai lista betöltve.", "success");
+  } catch (error) {
+    if (showErrors) showOfficeStatus(`A teljes lista betöltése nem sikerült: ${error?.message || "ismeretlen hiba"}.`, "error");
+  } finally {
+    officeLoading = false;
   }
 }
 
@@ -619,9 +693,34 @@ $("#recentWorksheets").addEventListener("click", event => {
 $("#officeWorksheets").addEventListener("click", event => {
   const edit = event.target.closest("[data-edit]");
   const print = event.target.closest("[data-print]");
+  const remove = event.target.closest("[data-delete]");
   if (edit) openWorksheetForEdit(edit.dataset.edit);
   if (print) printWorksheet(print.dataset.print);
+  if (remove) deleteWorksheet(remove.dataset.delete, remove);
 });
+
+async function deleteWorksheet(id, button) {
+  if (session?.role !== "manager") return;
+  const item = worksheets.find(worksheet => worksheet.id === id);
+  if (!item) return;
+  const label = `${item.leader} – ${item.customer || "Nincs ügyfél"} – ${formatHungarianDate(item.date)}`;
+  if (!confirm(`Biztosan törlöd ezt a munkalapot?\n\n${label}`)) return;
+  if (!confirm(`VÉGLEGES TÖRLÉS\n\n${label}\n\nA törlés nem vonható vissza. Folytatod?`)) return;
+  button.disabled = true;
+  button.textContent = "Törlés…";
+  showOfficeStatus("A munkalap törlése folyamatban…");
+  try {
+    await MunkalapDB.remove(id);
+    worksheets = worksheets.filter(worksheet => worksheet.id !== id);
+    renderAll();
+    showOfficeStatus("A munkalapot véglegesen töröltük.", "success");
+    loadDatabaseUsage();
+  } catch (error) {
+    button.disabled = false;
+    button.textContent = "Törlés";
+    showOfficeStatus(`A törlés nem sikerült: ${error?.message || "ismeretlen hiba"}.`, "error");
+  }
+}
 
 function setManagerView(view) {
   if (session?.role !== "manager") return;
@@ -632,13 +731,24 @@ function setManagerView(view) {
   $("#officeTab").classList.toggle("active", officeViewActive);
   $("#worksheetTab").classList.toggle("active", !officeViewActive);
   if (officeViewActive) {
+    if (officeWeekActive) applyOfficeWeek();
     renderOffice();
     loadDatabaseUsage();
+    if (!officeLoaded) loadOfficeWorksheets();
   }
 }
 
 $("#officeTab").addEventListener("click", () => setManagerView("office"));
 $("#worksheetTab").addEventListener("click", () => setManagerView("worksheet"));
+$("#previousOfficeWeek").addEventListener("click", () => moveOfficeWeek(-7));
+$("#nextOfficeWeek").addEventListener("click", () => moveOfficeWeek(7));
+$("#showAllOfficeWeeks").addEventListener("click", () => {
+  officeWeekActive = false;
+  $("#filterFrom").value = "";
+  $("#filterTo").value = "";
+  $("#officeWeekLabel").textContent = "Összes munkalap";
+  renderOffice();
+});
 
 function populateFilters() {
   $("#filterLeader").innerHTML = `<option value="">Mind</option>${LEADERS.map(name => `<option value="${escapeHTML(name)}">${escapeHTML(name)}</option>`).join("")}`;
@@ -691,9 +801,9 @@ function csvCell(value) {
   return `"${String(value ?? "").replaceAll('"', '""')}"`;
 }
 
-function exportOfficeCSV() {
+function officeExportRows(items) {
   const rows = [["Csoportvezető", "Ügyfél", "Cím", "Dátum", "Csapat", "Alvállalkozó", "Feladat", "Tételek", "Gépbérlés"]];
-  filteredOfficeWorksheets().forEach(item => rows.push([
+  items.forEach(item => rows.push([
     item.leader,
     item.customer,
     item.address,
@@ -704,13 +814,40 @@ function exportOfficeCSV() {
     filledMaterialItems(item.data).join(" | "),
     filledRentals(item.data).join(" | ")
   ]));
+  return rows;
+}
+
+function downloadExcelCompatibleCSV(rows, filename) {
   const content = "\ufeff" + rows.map(row => row.map(csvCell).join(";")).join("\r\n");
   const url = URL.createObjectURL(new Blob([content], { type: "text/csv;charset=utf-8" }));
   const link = document.createElement("a");
   link.href = url;
-  link.download = `munkalapok-${isoToday()}.csv`;
+  link.download = filename;
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function exportOfficeCSV() {
+  const items = filteredOfficeWorksheets();
+  if (!items.length) {
+    showOfficeStatus("Nincs letölthető munkalap a jelenlegi szűrésben.", "error");
+    return;
+  }
+  downloadExcelCompatibleCSV(officeExportRows(items), `munkalapok-${isoToday()}.csv`);
+  showOfficeStatus(`${items.length} munkalap Excel-kompatibilis fájlja letöltve.`, "success");
+}
+
+async function archivePreviousYear() {
+  if (!officeLoaded) await loadOfficeWorksheets();
+  if (!officeLoaded) return;
+  const year = new Date().getFullYear() - 1;
+  const items = worksheets.filter(item => item.date?.startsWith(`${year}-`));
+  if (!items.length) {
+    showOfficeStatus(`Nincs archiválható ${year}. évi munkalap.`, "error");
+    return;
+  }
+  downloadExcelCompatibleCSV(officeExportRows(items), `munkalap-archivum-${year}.csv`);
+  showOfficeStatus(`${items.length} darab ${year}. évi munkalap archiválva. Az adatbázisból semmi nem törlődött.`, "success");
 }
 
 function printOfficeList() {
@@ -730,9 +867,15 @@ function printOfficeList() {
 }
 
 $("#exportExcel").addEventListener("click", exportOfficeCSV);
+$("#archivePreviousYear").addEventListener("click", archivePreviousYear);
 $("#exportPdf").addEventListener("click", printOfficeList);
 
-[$("#filterLeader"), $("#filterFrom"), $("#filterTo")].forEach(element => element.addEventListener("change", renderOffice));
+$("#filterLeader").addEventListener("change", renderOffice);
+[$("#filterFrom"), $("#filterTo")].forEach(element => element.addEventListener("change", () => {
+  officeWeekActive = false;
+  $("#officeWeekLabel").textContent = "Egyéni időszak";
+  renderOffice();
+}));
 [$("#filterCustomer"), $("#filterAddress")].forEach(element => element.addEventListener("input", renderOffice));
 $("#clearFilters").addEventListener("click", () => {
   $("#filterLeader").value = "";
@@ -740,6 +883,8 @@ $("#clearFilters").addEventListener("click", () => {
   $("#filterAddress").value = "";
   $("#filterFrom").value = "";
   $("#filterTo").value = "";
+  officeWeekActive = false;
+  $("#officeWeekLabel").textContent = "Összes munkalap";
   renderOffice();
 });
 
@@ -787,25 +932,34 @@ $("#pinField").addEventListener("keydown", event => { if (event.key === "Enter")
 
 async function openApp(profile) {
   session = profile;
+  officeLoaded = false;
+  officeLoading = false;
   $("#loginView").hidden = true;
   $("#appView").hidden = false;
   $("#activeUser").textContent = `Belépve: ${profile.name}`;
   $("#previewBanner").hidden = !LOCAL_PREVIEW;
   $("#managerTabs").hidden = profile.role !== "manager";
   resetForm();
-  if (profile.role === "manager") setManagerView(localStorage.getItem(MANAGER_VIEW_KEY) || "worksheet");
-  else {
+  const initialManagerView = profile.role === "manager"
+    ? localStorage.getItem(MANAGER_VIEW_KEY) || "worksheet"
+    : "worksheet";
+  if (profile.role !== "manager") {
     $("#officeView").hidden = true;
     $("#worksheetView").hidden = false;
   }
   const now = new Date();
   $("#archiveReminder").hidden = !(now.getMonth() === 11 && now.getDate() >= 10);
   await loadWorksheets();
+  if (profile.role === "manager") setManagerView(initialManagerView);
   updateQueueNotice();
   syncQueue();
   MunkalapDB.subscribe(() => {
     clearTimeout(realtimeRefreshTimer);
-    realtimeRefreshTimer = setTimeout(() => loadWorksheets(false), 700);
+    realtimeRefreshTimer = setTimeout(() => {
+      officeLoaded = false;
+      if (officeViewActive && session?.role === "manager") loadOfficeWorksheets(false);
+      else loadWorksheets(false);
+    }, 700);
   });
 }
 
@@ -814,6 +968,8 @@ async function logout() {
   await MunkalapDB.logout();
   session = null;
   worksheets = [];
+  officeLoaded = false;
+  officeLoading = false;
   $("#appView").hidden = true;
   $("#loginView").hidden = false;
   selectedProfile = "";

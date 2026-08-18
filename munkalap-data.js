@@ -222,21 +222,48 @@
       if (client) await client.auth.signOut();
     },
 
-    async list() {
+    async listRecent() {
       if (previewMode) {
         if (!previewProfile) return [];
-        const visible = previewProfile.role === "manager"
-          ? previewWorksheets
-          : previewWorksheets.filter(item => item.userId === previewProfile.userId).slice(0, 10);
+        const visible = previewWorksheets
+          .filter(item => item.userId === previewProfile.userId)
+          .slice(0, 10);
         return visible.map(item => ({ ...item, data: { ...item.data } }));
+      }
+      const { data: authData, error: authError } = await client.auth.getUser();
+      if (authError || !authData?.user) {
+        throw authError || new Error("Nincs aktív belépés.");
       }
       const { data, error } = await client
         .from("worksheets")
         .select("*")
+        .eq("user_id", authData.user.id)
         .order("work_date", { ascending: false })
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(10);
       if (error) throw error;
       return data.map(mapWorksheet);
+    },
+
+    async listAll() {
+      if (previewMode) {
+        if (previewProfile?.role !== "manager") throw new Error("Nincs jogosultság.");
+        return previewWorksheets.map(item => ({ ...item, data: { ...item.data } }));
+      }
+      const pageSize = 500;
+      const result = [];
+      for (let from = 0; ; from += pageSize) {
+        const { data, error } = await client
+          .from("worksheets")
+          .select("*")
+          .order("work_date", { ascending: false })
+          .order("created_at", { ascending: false })
+          .range(from, from + pageSize - 1);
+        if (error) throw error;
+        result.push(...data.map(mapWorksheet));
+        if (data.length < pageSize) break;
+      }
+      return result;
     },
 
     async create(item, userId) {
@@ -279,6 +306,24 @@
         .single();
       if (error) throw error;
       return mapWorksheet(data);
+    },
+
+    async remove(id) {
+      if (previewMode) {
+        if (previewProfile?.role !== "manager") throw new Error("Nincs jogosultság.");
+        const index = previewWorksheets.findIndex(record => record.id === id);
+        if (index < 0) throw new Error("A munkalap nem található.");
+        previewWorksheets.splice(index, 1);
+        return id;
+      }
+      const { data, error } = await client
+        .from("worksheets")
+        .delete()
+        .eq("id", id)
+        .select("id")
+        .single();
+      if (error) throw error;
+      return data.id;
     },
 
     async databaseSize() {

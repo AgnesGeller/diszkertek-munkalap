@@ -192,9 +192,19 @@ with check (
   )
 );
 
+drop policy if exists worksheets_delete_manager on munkalap.worksheets;
+create policy worksheets_delete_manager
+on munkalap.worksheets
+for delete
+to authenticated
+using (
+  (select auth.uid()) is not null
+  and (select munkalap_private.is_manager())
+);
+
 revoke all on all tables in schema munkalap from public, anon;
 grant select on table munkalap.profiles to authenticated;
-grant select, insert, update on table munkalap.worksheets to authenticated;
+grant select, insert, update, delete on table munkalap.worksheets to authenticated;
 grant all on table munkalap.profiles, munkalap.worksheets to service_role;
 
 create or replace function munkalap.database_size()
@@ -231,4 +241,3 @@ end
 $$;
 
 commit;
-
