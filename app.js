@@ -1,7 +1,7 @@
 const EMAIL_ENDPOINT = "https://formsubmit.co/ajax/info@diszkertek.hu";
 const EMAIL_RECIPIENT = "info@diszkertek.hu";
 const STABLE_APP_URL = "https://agnesgeller.github.io/diszkertek-munkalap/";
-const APP_VERSION = "14";
+const APP_VERSION = "16";
 const QUEUE_KEY = "diszkertek-munkalap-send-queue-v1";
 const MANAGER_VIEW_KEY = "diszkertek-munkalap-manager-view-v1";
 const DATABASE_FREE_LIMIT = 500 * 1024 * 1024;
@@ -186,6 +186,7 @@ function readQueue() {
 function writeQueue(queue) {
   localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
   updateQueueNotice();
+  if (session) renderRecent();
 }
 
 function addQueueItem(item) {
@@ -243,7 +244,7 @@ function makeQueueItem(action, record, emailPayload, databaseSaved = false) {
 }
 
 async function syncQueue() {
-  if (queueSyncRunning || !session || !navigator.onLine) return;
+  if (queueSyncRunning || !session || !navigator.onLine) return false;
   queueSyncRunning = true;
   let queue = readQueue();
   let changed = false;
@@ -268,6 +269,7 @@ async function syncQueue() {
   writeQueue(queue);
   queueSyncRunning = false;
   if (changed) await loadWorksheets(false);
+  return changed;
 }
 
 function resetForm(options = {}) {
@@ -359,9 +361,13 @@ form.addEventListener("submit", async event => {
       fallbackEmailButton.hidden = false;
       showStatus("Nincs megfelelő internetkapcsolat. A munkalapot elmentettük a telefonon, és küldésre vár. Az e-mail alkalmazással most is elküldheted.", "pending");
     } else {
-      fallbackEmailContext = { payload: emailPayload, queueId: null, clearAfterReturn: false };
+      const queued = makeQueueItem(action, record, emailPayload, false);
+      queued.lastError = error?.message || "ismeretlen mentési hiba";
+      addQueueItem(queued);
+      pendingCurrentQueueId = queued.queueId;
+      fallbackEmailContext = { payload: emailPayload, queueId: queued.queueId, clearAfterReturn: true };
       fallbackEmailButton.hidden = false;
-      showStatus(`A munkalap mentése nem sikerült: ${error?.message || "ismeretlen hiba"}. Az adatok itt maradtak; a tartalék e-mail-küldést használhatod.`);
+      showStatus(`Az adatbázisba mentés még nem sikerült: ${error?.message || "ismeretlen hiba"}. A munkalapot a telefonon megőriztük és automatikusan újrapróbáljuk; a tartalék e-mail-küldést most is használhatod.`, "pending");
     }
   } finally {
     button.disabled = false;
@@ -410,6 +416,12 @@ window.addEventListener("online", () => {
   serviceWorkerRegistration?.update().catch(() => {});
 });
 window.addEventListener("offline", () => updateQueueNotice());
+
+// A tartalék e-mail után a helyben megőrzött munkalap akkor is kerüljön be
+// automatikusan az adatbázisba, ha a telefon nem jelez külön hálózatváltást.
+setInterval(() => {
+  if (session && navigator.onLine && ownQueue().length) syncQueue();
+}, 15000);
 
 function teamLines(data) {
   const lines = [];
@@ -464,6 +476,7 @@ function worksheetCardHTML(item, office = false) {
   return `
     <article class="worksheet-card" data-id="${escapeHTML(item.id)}">
       <h3>Csapat: ${escapeHTML(item.leader)}</h3>
+      ${item.pending ? `<p class="pending-record"><b>Küldésre vár</b> – a telefon megőrzi, és internetkapcsolatnál újrapróbálja.</p>` : ""}
       ${listHTML(teams, "team-summary")}
       ${subcontractor ? `<p><b>Alvállalkozó:</b> ${escapeHTML(subcontractor)}</p>` : ""}
       ${item.customer ? `<p><b>Ügyfél:</b> ${escapeHTML(item.customer)}</p>` : ""}
@@ -472,7 +485,7 @@ function worksheetCardHTML(item, office = false) {
       ${materials.length ? `<div class="summary-group"><b>Tételek:</b>${listHTML(materials)}</div>` : ""}
       ${rentals.length ? `<div class="summary-group"><b>Gépbérlés:</b>${listHTML(rentals)}</div>` : ""}
       <div class="card-actions">
-        <button type="button" data-edit="${escapeHTML(item.id)}">Megnyitás / Szerkesztés</button>
+        ${item.pending ? "" : `<button type="button" data-edit="${escapeHTML(item.id)}">Megnyitás / Szerkesztés</button>`}
         ${office ? `<button type="button" data-print="${escapeHTML(item.id)}">PDF / Nyomtatás</button>` : ""}
       </div>
     </article>`;
@@ -483,7 +496,17 @@ function sortedByCreated(items) {
 }
 
 function ownRecentWorksheets() {
-  return sortedByCreated(worksheets.filter(item => item.userId === session?.userId)).slice(0, 10);
+  const saved = worksheets.filter(item => item.userId === session?.userId);
+  const savedIds = new Set(saved.map(item => item.id));
+  const pending = ownQueue()
+    .filter(item => !item.databaseSaved && item.record && !savedIds.has(item.record.id))
+    .map(item => ({
+      ...item.record,
+      pending: true,
+      createdAt: item.queuedAt || new Date().toISOString(),
+      updatedAt: item.queuedAt || new Date().toISOString()
+    }));
+  return sortedByCreated([...saved, ...pending]).slice(0, 10);
 }
 
 function renderRecent() {
@@ -801,7 +824,31 @@ async function logout() {
 }
 
 $("#logoutButton").addEventListener("click", logout);
-$("#reloadHistory").addEventListener("click", () => loadWorksheets());
+$("#reloadHistory").addEventListener("click", async () => {
+  const button = $("#reloadHistory");
+  button.disabled = true;
+  button.textContent = "Frissítés…";
+  try {
+    if (!navigator.onLine) {
+      showStatus("Nincs internetkapcsolat. A várakozó munkalapokat internetkapcsolatnál lehet elküldeni.", "pending");
+      return;
+    }
+    await syncQueue();
+    await loadWorksheets();
+    updateQueueNotice();
+    const waiting = ownQueue().length;
+    if (waiting) {
+      showStatus(`${waiting} munkalap továbbra is küldésre vár. Próbáld meg újra stabil internetkapcsolattal.`, "pending");
+    } else {
+      showStatus("A munkalapok frissítve.", "success");
+    }
+  } catch (error) {
+    showStatus(`A frissítés nem sikerült: ${error?.message || "ismeretlen hiba"}.`);
+  } finally {
+    button.disabled = false;
+    button.textContent = "Frissítés";
+  }
+});
 $("#clearForm").addEventListener("click", () => {
   if (confirm("Biztosan törlöd a teljes munkalapot?")) resetForm();
 });

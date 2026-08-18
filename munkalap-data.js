@@ -1,5 +1,6 @@
 (function () {
   const PROFILE_KEY = "diszkertek-munkalap-profile-v1";
+  const DEVICE_SESSION_KEY = "diszkertek-munkalap-device-session-v1";
   const EMAILS = {
     "Ádám": "adam@munkalap.diszkertek.hu",
     "Ági": "agi@munkalap.diszkertek.hu",
@@ -34,7 +35,18 @@
         persistSession: true,
         autoRefreshToken: true,
         detectSessionInUrl: false,
+        storage: window.localStorage,
         storageKey: "diszkertek-munkalap-auth-v1"
+      }
+    });
+    client.auth.onAuthStateChange((event, currentSession) => {
+      if (currentSession?.access_token && currentSession?.refresh_token) {
+        localStorage.setItem(DEVICE_SESSION_KEY, JSON.stringify({
+          access_token: currentSession.access_token,
+          refresh_token: currentSession.refresh_token
+        }));
+      } else if (event === "SIGNED_OUT") {
+        localStorage.removeItem(DEVICE_SESSION_KEY);
       }
     });
   }
@@ -156,6 +168,12 @@
       if (!email) throw new Error("Ehhez a névhez még nincs belépés beállítva.");
       const { data, error } = await client.auth.signInWithPassword({ email, password: pin });
       if (error) throw new Error("Hibás PIN-kód.");
+      if (data.session?.access_token && data.session?.refresh_token) {
+        localStorage.setItem(DEVICE_SESSION_KEY, JSON.stringify({
+          access_token: data.session.access_token,
+          refresh_token: data.session.refresh_token
+        }));
+      }
       const profile = await profileFor(data.user);
       if (profile.name !== name) {
         await client.auth.signOut();
@@ -167,7 +185,18 @@
     async restore() {
       if (previewMode) return null;
       if (!client) return null;
-      const { data } = await client.auth.getSession();
+      let { data } = await client.auth.getSession();
+      if (!data.session) {
+        try {
+          const savedSession = JSON.parse(localStorage.getItem(DEVICE_SESSION_KEY));
+          if (savedSession?.access_token && savedSession?.refresh_token) {
+            const restored = await client.auth.setSession(savedSession);
+            if (!restored.error) data = restored.data;
+          }
+        } catch (_) {
+          localStorage.removeItem(DEVICE_SESSION_KEY);
+        }
+      }
       if (!data.session) {
         localStorage.removeItem(PROFILE_KEY);
         return null;
@@ -189,6 +218,7 @@
       if (channel) await client.removeChannel(channel);
       channel = null;
       localStorage.removeItem(PROFILE_KEY);
+      localStorage.removeItem(DEVICE_SESSION_KEY);
       if (client) await client.auth.signOut();
     },
 

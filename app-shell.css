@@ -32,6 +32,7 @@ button{font-family:Arial,sans-serif}
 .worksheet-card{padding:18px 20px;border:1px solid rgba(49,95,55,.2);border-radius:15px;background:#fff;box-shadow:0 4px 15px rgba(41,72,50,.07)}
 .worksheet-card h3{margin:0 0 10px;color:var(--green);font-size:19px}
 .worksheet-card p{margin:7px 0;font-size:15px;line-height:1.4}
+.worksheet-card .pending-record{margin:10px 0;padding:10px 12px;border-radius:9px;color:#664b17;background:#fff1cd;font-family:Arial,sans-serif}
 .summary-group{margin-top:10px}
 .summary-lines,.team-summary{margin:6px 0 8px;padding-left:20px}
 .summary-lines li,.team-summary li{margin:4px 0;line-height:1.35}
