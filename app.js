@@ -1,7 +1,7 @@
 const EMAIL_ENDPOINT = "https://formsubmit.co/ajax/info@diszkertek.hu";
 const EMAIL_RECIPIENT = "info@diszkertek.hu";
 const STABLE_APP_URL = "https://agnesgeller.github.io/diszkertek-munkalap/";
-const APP_VERSION = "17";
+const APP_VERSION = "18";
 const QUEUE_KEY = "diszkertek-munkalap-send-queue-v1";
 const MANAGER_VIEW_KEY = "diszkertek-munkalap-manager-view-v1";
 const DATABASE_FREE_LIMIT = 500 * 1024 * 1024;
@@ -191,18 +191,21 @@ function buildEmailPayload(data, modified = false) {
 
 function fallbackEmailUrl(payload) {
   const subject = String(payload?._subject || "MUNKALAP");
-  const body = ["MUNKALAP", "", ...Object.entries(payload || {})
+  const rows = Object.entries(payload || {})
     .filter(([name, value]) => !name.startsWith("_") && String(value || "").trim())
-    .map(([name, value]) => `${name}: ${value}`)].join("\n");
+    .map(([name, value]) => `${name}:\r\n${String(value).trim()}`);
+  const body = ["MUNKALAP", "────────────────────", ...rows].join("\r\n\r\n");
   return `mailto:${EMAIL_RECIPIENT}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 
 async function sendEmail(payload) {
   if (LOCAL_PREVIEW) return;
+  const formBody = new URLSearchParams();
+  Object.entries(payload || {}).forEach(([name, value]) => formBody.append(name, String(value ?? "")));
   const response = await fetch(EMAIL_ENDPOINT, {
     method: "POST",
-    headers: { "Content-Type": "application/json", "Accept": "application/json" },
-    body: JSON.stringify(payload)
+    headers: { "Accept": "application/json" },
+    body: formBody
   });
   const result = await response.json().catch(() => ({}));
   const explicitlyFailed = result.success === false || String(result.success).toLowerCase() === "false";
