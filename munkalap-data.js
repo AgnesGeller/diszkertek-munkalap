@@ -1,6 +1,7 @@
 (function () {
   const PROFILE_KEY = "diszkertek-munkalap-profile-v1";
   const DEVICE_SESSION_KEY = "diszkertek-munkalap-device-session-v1";
+  const DEVICE_SESSIONS_KEY = "diszkertek-munkalap-device-sessions-v2";
   const EMAILS = {
     "Ádám": "adam@munkalap.diszkertek.hu",
     "Ági": "agi@munkalap.diszkertek.hu",
@@ -11,6 +12,7 @@
     "Márk": "mark@munkalap.diszkertek.hu",
     "Tamás": "tamas@munkalap.diszkertek.hu"
   };
+  const MANAGER_NAMES = ["Ági", "Tamás"];
 
   const config = window.MUNKALAP_SUPABASE || {};
   const previewMode = ["localhost", "127.0.0.1"].includes(window.location.hostname)
@@ -28,6 +30,46 @@
   let previewProfile = null;
   let previewWorksheets = [];
 
+  function readRememberedSessions() {
+    try { return JSON.parse(localStorage.getItem(DEVICE_SESSIONS_KEY)) || {}; }
+    catch (_) { return {}; }
+  }
+
+  function writeRememberedSessions(sessions) {
+    localStorage.setItem(DEVICE_SESSIONS_KEY, JSON.stringify(sessions));
+  }
+
+  function rememberSession(currentSession) {
+    const email = currentSession?.user?.email?.toLocaleLowerCase("hu-HU");
+    if (!email || !currentSession?.access_token || !currentSession?.refresh_token) return;
+    const sessions = readRememberedSessions();
+    sessions[email] = {
+      access_token: currentSession.access_token,
+      refresh_token: currentSession.refresh_token
+    };
+    writeRememberedSessions(sessions);
+    localStorage.setItem(DEVICE_SESSION_KEY, JSON.stringify(sessions[email]));
+  }
+
+  function forgetRememberedSession(name) {
+    const email = EMAILS[name]?.toLocaleLowerCase("hu-HU");
+    if (!email) return;
+    const sessions = readRememberedSessions();
+    delete sessions[email];
+    writeRememberedSessions(sessions);
+  }
+
+  function rememberedSessionFor(name) {
+    const email = EMAILS[name]?.toLocaleLowerCase("hu-HU");
+    return email ? readRememberedSessions()[email] : null;
+  }
+
+  function rememberedManagerSessions() {
+    return MANAGER_NAMES
+      .map(name => ({ name, session: rememberedSessionFor(name) }))
+      .filter(item => item.session?.access_token && item.session?.refresh_token);
+  }
+
   if (remoteConfigured) {
     client = window.supabase.createClient(config.url, config.publishableKey, {
       db: { schema: "munkalap" },
@@ -41,12 +83,7 @@
     });
     client.auth.onAuthStateChange((event, currentSession) => {
       if (currentSession?.access_token && currentSession?.refresh_token) {
-        localStorage.setItem(DEVICE_SESSION_KEY, JSON.stringify({
-          access_token: currentSession.access_token,
-          refresh_token: currentSession.refresh_token
-        }));
-      } else if (event === "SIGNED_OUT") {
-        localStorage.removeItem(DEVICE_SESSION_KEY);
+        rememberSession(currentSession);
       }
     });
   }
@@ -153,6 +190,12 @@
     configured,
     previewMode,
 
+    hasRememberedLogin(name) {
+      if (previewMode) return false;
+      const saved = rememberedSessionFor(name);
+      return Boolean(saved?.access_token && saved?.refresh_token) || rememberedManagerSessions().length > 0;
+    },
+
     async login(name, pin) {
       if (previewMode) {
         if (pin !== "123456") throw new Error("A bemutató PIN-kód: 123456");
@@ -166,17 +209,60 @@
       if (!client) throw new Error("Az adatbázis-kapcsolat még nincs beállítva.");
       const email = EMAILS[name];
       if (!email) throw new Error("Ehhez a névhez még nincs belépés beállítva.");
-      const { data, error } = await client.auth.signInWithPassword({ email, password: pin });
-      if (error) throw new Error("Hibás PIN-kód.");
-      if (data.session?.access_token && data.session?.refresh_token) {
-        localStorage.setItem(DEVICE_SESSION_KEY, JSON.stringify({
-          access_token: data.session.access_token,
-          refresh_token: data.session.refresh_token
-        }));
+      let data;
+      const remembered = rememberedSessionFor(name);
+      if (!pin && remembered?.access_token && remembered?.refresh_token) {
+        const restored = await client.auth.setSession(remembered);
+        if (restored.error || !restored.data?.user) {
+          forgetRememberedSession(name);
+          if (rememberedManagerSessions().length) return window.MunkalapDB.login(name, "");
+          throw new Error("A korábbi belépés lejárt. Add meg újra egyszer a PIN-kódot.");
+        }
+        data = restored.data;
+      } else if (!pin) {
+        let managerProfile = null;
+        let managerUser = null;
+        for (const rememberedManager of rememberedManagerSessions()) {
+          const restored = await client.auth.setSession(rememberedManager.session);
+          if (restored.error || !restored.data?.user) {
+            forgetRememberedSession(rememberedManager.name);
+            continue;
+          }
+          const verified = await profileFor(restored.data.user);
+          if (verified.role === "manager") {
+            managerProfile = verified;
+            managerUser = restored.data.user;
+            rememberSession(restored.data.session);
+            break;
+          }
+        }
+        if (!managerProfile || !managerUser) {
+          throw new Error("Az irodai belépés lejárt. Ági vagy Tamás PIN-kódját add meg újra egyszer.");
+        }
+        const { data: target, error: targetError } = await client
+          .from("profiles")
+          .select("id,display_name,role")
+          .eq("display_name", name)
+          .single();
+        if (targetError) throw targetError;
+        const delegated = {
+          userId: target.id,
+          authUserId: managerUser.id,
+          name: target.display_name,
+          role: target.role,
+          delegatedBy: managerProfile.name
+        };
+        localStorage.setItem(PROFILE_KEY, JSON.stringify(delegated));
+        return delegated;
+      } else {
+        const signedIn = await client.auth.signInWithPassword({ email, password: pin });
+        if (signedIn.error) throw new Error("Hibás PIN-kód.");
+        data = signedIn.data;
       }
+      rememberSession(data.session);
       const profile = await profileFor(data.user);
       if (profile.name !== name) {
-        await client.auth.signOut();
+        forgetRememberedSession(name);
         throw new Error("A PIN-kód nem ehhez a névhez tartozik.");
       }
       return profile;
@@ -203,7 +289,7 @@
       }
       try {
         const cached = JSON.parse(localStorage.getItem(PROFILE_KEY));
-        if (cached?.userId === data.session.user.id) return cached;
+        if (cached?.userId === data.session.user.id || cached?.authUserId === data.session.user.id) return cached;
       } catch (_) {
         localStorage.removeItem(PROFILE_KEY);
       }
@@ -218,11 +304,11 @@
       if (channel) await client.removeChannel(channel);
       channel = null;
       localStorage.removeItem(PROFILE_KEY);
-      localStorage.removeItem(DEVICE_SESSION_KEY);
-      if (client) await client.auth.signOut();
+      // Ez névváltás: a korábban ellenőrzött belépéseket ezen az eszközön
+      // szándékosan megőrizzük, ezért nem vonjuk vissza a refresh tokent.
     },
 
-    async listRecent() {
+    async listRecent(userId) {
       if (previewMode) {
         if (!previewProfile) return [];
         const visible = previewWorksheets
@@ -237,7 +323,7 @@
       const { data, error } = await client
         .from("worksheets")
         .select("*")
-        .eq("user_id", authData.user.id)
+        .eq("user_id", userId || authData.user.id)
         .order("work_date", { ascending: false })
         .order("created_at", { ascending: false })
         .limit(10);
@@ -275,7 +361,7 @@
       }
       const { data, error } = await client
         .from("worksheets")
-        .insert(toRow(item, userId))
+        .upsert(toRow(item, userId), { onConflict: "id" })
         .select()
         .single();
       if (error) throw error;

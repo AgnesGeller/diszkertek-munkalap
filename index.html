@@ -6,13 +6,13 @@
   <meta name="theme-color" content="#315f37">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Munkalap">
-  <link rel="manifest" href="manifest.webmanifest?v=18">
+  <link rel="manifest" href="manifest.webmanifest?v=20">
   <link rel="icon" href="munkalap-m-favicon-v12.ico" sizes="any">
   <link rel="icon" href="munkalap-m-icon-32-v12.png" type="image/png" sizes="32x32">
   <link rel="apple-touch-icon" href="munkalap-m-icon-apple-180-v12.png">
-  <link rel="stylesheet" href="styles.css?v=18">
-  <link rel="stylesheet" href="logo-overrides.css?v=18">
-  <link rel="stylesheet" href="app-shell.css?v=18">
+  <link rel="stylesheet" href="styles.css?v=20">
+  <link rel="stylesheet" href="logo-overrides.css?v=20">
+  <link rel="stylesheet" href="app-shell.css?v=20">
   <title>Díszkertek – Napi munkalap</title>
 </head>
 <body>
@@ -48,7 +48,7 @@
       <div class="header-actions">
         <button id="installButton" type="button">Telepítés</button>
         <button id="refreshButton" type="button">Frissítés</button>
-        <button id="logoutButton" type="button">Kijelentkezés</button>
+        <button id="logoutButton" type="button">Név váltás</button>
       </div>
     </header>
 
@@ -160,11 +160,19 @@
 
   <dialog id="dateDialog" class="date-dialog"><h2>Dátum kiválasztása</h2><div class="date-selects"><label>Év<select id="dateYear"></select></label><label>Hónap<select id="dateMonth"></select></label><label>Nap<select id="dateDay"></select></label></div><div class="dialog-actions"><button id="dateCancel" class="secondary" type="button">Mégse</button><button id="dateApply" type="button">Dátum beírása</button></div></dialog>
   <dialog id="installDialog" class="install-dialog"><h2 id="installDialogTitle">Munkalap telepítése</h2><p id="installDialogText"></p><button id="installDialogClose" type="button">Rendben</button></dialog>
+  <dialog id="fallbackConfirmDialog" class="install-dialog">
+    <h2>Sikerült elküldeni?</h2>
+    <p>Az e-mail alkalmazásban meg kellett nyomnod a Küldés gombot.</p>
+    <div class="dialog-actions">
+      <button id="fallbackNotSent" class="secondary" type="button">Nem sikerült</button>
+      <button id="fallbackSent" type="button">Elküldtem</button>
+    </div>
+  </dialog>
   <dialog id="successDialog"><h2>Köszönöm, hogy beküldted a Munkalapot 😊</h2><p>Nagyon Cuki vagy ❤️</p><button id="newWorksheet" type="button">Új munkalap</button></dialog>
 
-  <script src="supabase.js?v=18"></script>
-  <script src="supabase-config.js?v=18"></script>
-  <script src="munkalap-data.js?v=18"></script>
-  <script src="app.js?v=18"></script>
+  <script src="supabase.js?v=20"></script>
+  <script src="supabase-config.js?v=20"></script>
+  <script src="munkalap-data.js?v=20"></script>
+  <script src="app.js?v=20"></script>
 </body>
 </html>

@@ -1,7 +1,7 @@
 const EMAIL_ENDPOINT = "https://formsubmit.co/ajax/info@diszkertek.hu";
 const EMAIL_RECIPIENT = "info@diszkertek.hu";
 const STABLE_APP_URL = "https://agnesgeller.github.io/diszkertek-munkalap/";
-const APP_VERSION = "18";
+const APP_VERSION = "20";
 const QUEUE_KEY = "diszkertek-munkalap-send-queue-v1";
 const MANAGER_VIEW_KEY = "diszkertek-munkalap-manager-view-v1";
 const DATABASE_FREE_LIMIT = 500 * 1024 * 1024;
@@ -117,10 +117,25 @@ function isoToday() {
 
 function toDateInputValue(value) {
   const text = String(value || "").trim();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
-  const digits = text.replace(/\D/g, "").slice(0, 8);
-  if (digits.length !== 8) return "";
-  return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6, 8)}`;
+  const isoCandidate = /^\d{4}-\d{2}-\d{2}$/.test(text)
+    ? text
+    : (() => {
+        const digits = text.replace(/\D/g, "").slice(0, 8);
+        return digits.length === 8
+          ? `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6, 8)}`
+          : "";
+      })();
+  const match = isoCandidate.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return "";
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(year, month - 1, day, 12);
+  return date.getFullYear() === year
+    && date.getMonth() === month - 1
+    && date.getDate() === day
+    ? isoCandidate
+    : "";
 }
 
 function formatHungarianDate(value) {
@@ -202,11 +217,22 @@ async function sendEmail(payload) {
   if (LOCAL_PREVIEW) return;
   const formBody = new URLSearchParams();
   Object.entries(payload || {}).forEach(([name, value]) => formBody.append(name, String(value ?? "")));
-  const response = await fetch(EMAIL_ENDPOINT, {
-    method: "POST",
-    headers: { "Accept": "application/json" },
-    body: formBody
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 12000);
+  let response;
+  try {
+    response = await fetch(EMAIL_ENDPOINT, {
+      method: "POST",
+      headers: { "Accept": "application/json" },
+      body: formBody,
+      signal: controller.signal
+    });
+  } catch (error) {
+    if (error?.name === "AbortError") throw new Error("Az automatikus e-mail-küldés túl sokáig várakozott.");
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
   const result = await response.json().catch(() => ({}));
   const explicitlyFailed = result.success === false || String(result.success).toLowerCase() === "false";
   if (!response.ok || explicitlyFailed) throw new Error(result.message || `Küldési hiba (${response.status})`);
@@ -225,7 +251,10 @@ function clearStatus() {
 
 function readQueue() {
   if (LOCAL_PREVIEW) return [];
-  try { return JSON.parse(localStorage.getItem(QUEUE_KEY)) || []; }
+  try {
+    const queue = JSON.parse(localStorage.getItem(QUEUE_KEY));
+    return Array.isArray(queue) ? queue : [];
+  }
   catch (_) { return []; }
 }
 
@@ -262,17 +291,37 @@ function updateQueueNotice() {
     notice.textContent = "";
     return;
   }
-  notice.hidden = false;
-  notice.textContent = `${queue.length} munkalap küldésre vár. Internetkapcsolatnál az alkalmazás automatikusan újrapróbálja.`;
   const emailWaiting = queue.find(item => !item.emailSent && !item.emailHandledManually);
   if (emailWaiting && !fallbackEmailContext) {
     fallbackEmailContext = { payload: emailWaiting.emailPayload, queueId: emailWaiting.queueId, clearAfterReturn: false };
     fallbackEmailButton.hidden = false;
   }
+  const officeDevice = session.role === "manager" || Boolean(session.delegatedBy);
+  if (!officeDevice) {
+    notice.hidden = true;
+    notice.textContent = "";
+    return;
+  }
+  notice.hidden = false;
+  const databaseWaiting = queue.filter(item => !item.databaseSaved).length;
+  const emailWaitingCount = queue.filter(item => !item.emailSent && !item.emailHandledManually).length;
+  const stages = [];
+  if (databaseWaiting) stages.push(`${databaseWaiting} adatbázis-mentése vár`);
+  if (emailWaitingCount) stages.push(`${emailWaitingCount} e-mail-küldése vár`);
+  const lastError = [...queue].reverse().find(item => item.lastError || item.emailError);
+  notice.textContent = `${queue.length} munkalap feldolgozása még nem teljes (${stages.join(", ")}). Az alkalmazás automatikusan újrapróbálja.${lastError ? ` Utolsó hiba: ${lastError.lastError || lastError.emailError}` : ""}`;
 }
 
 function isNetworkError(error) {
   return !navigator.onLine || /fetch|network|kapcsolat|load failed/i.test(String(error?.message || error || ""));
+}
+
+function withTimeout(promise, milliseconds, message) {
+  let timeout;
+  const deadline = new Promise((_, reject) => {
+    timeout = setTimeout(() => reject(new Error(message)), milliseconds);
+  });
+  return Promise.race([promise, deadline]).finally(() => clearTimeout(timeout));
 }
 
 function makeQueueItem(action, record, emailPayload, databaseSaved = false) {
@@ -292,30 +341,50 @@ function makeQueueItem(action, record, emailPayload, databaseSaved = false) {
 async function syncQueue() {
   if (queueSyncRunning || !session || !navigator.onLine) return false;
   queueSyncRunning = true;
-  let queue = readQueue();
-  let changed = false;
-  for (const item of queue.filter(entry => (entry.queuedBy || entry.userId) === session.userId)) {
-    try {
+  try {
+    let queue = readQueue();
+    let changed = false;
+    const canSyncAll = session.role === "manager" || Boolean(session.delegatedBy);
+    for (const item of queue.filter(entry => canSyncAll || (entry.queuedBy || entry.userId) === session.userId)) {
       if (!item.databaseSaved) {
-        if (item.action === "update") await MunkalapDB.update(item.record.id, item.record);
-        else await MunkalapDB.create(item.record, item.record.userId);
-        item.databaseSaved = true;
-        changed = true;
+        try {
+          const databaseTask = item.action === "update"
+            ? MunkalapDB.update(item.record.id, item.record)
+            : MunkalapDB.create(item.record, item.record.userId);
+          await withTimeout(databaseTask, 12000, "Az adatbázis-kapcsolat túl sokáig várakozott.");
+          item.databaseSaved = true;
+          changed = true;
+        } catch (error) {
+          item.lastError = error?.message || "Mentési hiba";
+          if (!isNetworkError(error)) item.permanentError = item.lastError;
+        }
+      }
+      if (item.databaseSaved && item.statusUpdatePending) {
+        try {
+          await withTimeout(MunkalapDB.update(item.record.id, item.record), 12000, "Az irodai állapot mentése túl sokáig várakozott.");
+          item.statusUpdatePending = false;
+          changed = true;
+        } catch (error) {
+          item.lastError = error?.message || "Az irodai állapot mentése nem sikerült";
+        }
       }
       if (!item.emailSent && !item.emailHandledManually) {
-        await sendEmail(item.emailPayload);
-        item.emailSent = true;
-        changed = true;
+        try {
+          await sendEmail(item.emailPayload);
+          item.emailSent = true;
+          changed = true;
+        } catch (error) {
+          item.emailError = error?.message || "E-mail-küldési hiba";
+        }
       }
-    } catch (error) {
-      if (!isNetworkError(error) && !item.databaseSaved) item.permanentError = error.message || "Mentési hiba";
     }
+    queue = queue.filter(item => !(item.databaseSaved && !item.statusUpdatePending && (item.emailSent || item.emailHandledManually)));
+    writeQueue(queue);
+    if (changed) await loadWorksheets(false);
+    return changed;
+  } finally {
+    queueSyncRunning = false;
   }
-  queue = queue.filter(item => !(item.databaseSaved && (item.emailSent || item.emailHandledManually)));
-  writeQueue(queue);
-  queueSyncRunning = false;
-  if (changed) await loadWorksheets(false);
-  return changed;
 }
 
 function resetForm(options = {}) {
@@ -381,40 +450,57 @@ form.addEventListener("submit", async event => {
   button.textContent = existing ? "Módosítás mentése…" : "Küldés folyamatban…";
 
   try {
-    if (!navigator.onLine) throw new TypeError("Failed to fetch");
-    const saved = existing
-      ? await MunkalapDB.update(record.id, record)
-      : await MunkalapDB.create(record, session.userId);
-    updateWorksheetCache(saved);
-    try {
-      await sendEmail(emailPayload);
+    let saved = null;
+    let databaseError = null;
+    let emailError = null;
+
+    if (navigator.onLine) {
+      const databaseTask = existing
+        ? MunkalapDB.update(record.id, record)
+        : MunkalapDB.create(record, session.userId);
+      const [databaseResult, emailResult] = await Promise.allSettled([
+        withTimeout(Promise.resolve(databaseTask), 12000, "Az adatbázis-kapcsolat túl sokáig várakozott."),
+        sendEmail(emailPayload)
+      ]);
+      if (databaseResult.status === "fulfilled") {
+        saved = databaseResult.value;
+        updateWorksheetCache(saved);
+      } else {
+        databaseError = databaseResult.reason;
+      }
+      if (emailResult.status === "rejected") emailError = emailResult.reason;
+    } else {
+      databaseError = new TypeError("Nincs internetkapcsolat");
+      emailError = new TypeError("Nincs internetkapcsolat");
+    }
+
+    if (!databaseError && !emailError) {
       resetForm();
       $("#successDialog").showModal();
-    } catch (emailError) {
-      const queued = makeQueueItem(action, { ...record, ...saved }, emailPayload, true);
-      addQueueItem(queued);
-      pendingCurrentQueueId = queued.queueId;
-      fallbackEmailContext = { payload: emailPayload, queueId: queued.queueId, clearAfterReturn: true };
-      fallbackEmailButton.hidden = false;
-      showStatus("A munkalapot elmentettük, de az automatikus e-mail nem ment el. Nyomd meg a „Küldés e-mail alkalmazással” gombot.", "pending");
+      return;
     }
-  } catch (error) {
-    if (isNetworkError(error)) {
-      const queued = makeQueueItem(action, record, emailPayload, false);
-      addQueueItem(queued);
-      pendingCurrentQueueId = queued.queueId;
-      fallbackEmailContext = { payload: emailPayload, queueId: queued.queueId, clearAfterReturn: true };
-      fallbackEmailButton.hidden = false;
-      showStatus("Nincs megfelelő internetkapcsolat. A munkalapot elmentettük a telefonon, és küldésre vár. Az e-mail alkalmazással most is elküldheted.", "pending");
-    } else {
-      const queued = makeQueueItem(action, record, emailPayload, false);
-      queued.lastError = error?.message || "ismeretlen mentési hiba";
-      addQueueItem(queued);
-      pendingCurrentQueueId = queued.queueId;
-      fallbackEmailContext = { payload: emailPayload, queueId: queued.queueId, clearAfterReturn: true };
-      fallbackEmailButton.hidden = false;
-      showStatus(`Az adatbázisba mentés még nem sikerült: ${error?.message || "ismeretlen hiba"}. A munkalapot a telefonon megőriztük és automatikusan újrapróbáljuk; a tartalék e-mail-küldést most is használhatod.`, "pending");
+
+    if (databaseError && emailError) record.data._officeStatus = "database_delayed_email_fallback";
+    else if (databaseError) record.data._officeStatus = "database_delayed";
+    else if (emailError) record.data._officeStatus = "email_fallback";
+    const queuedRecord = saved ? { ...record, ...saved, data: { ...record.data } } : record;
+    const queued = makeQueueItem(action, queuedRecord, emailPayload, Boolean(saved));
+    queued.statusUpdatePending = Boolean(saved && emailError);
+    queued.emailSent = !emailError;
+    if (databaseError) queued.lastError = databaseError?.message || "ismeretlen mentési hiba";
+    addQueueItem(queued);
+
+    if (!emailError) {
+      resetForm();
+      updateQueueNotice();
+      $("#successDialog").showModal();
+      return;
     }
+
+    pendingCurrentQueueId = queued.queueId;
+    fallbackEmailContext = { payload: emailPayload, queueId: queued.queueId, clearAfterReturn: true };
+    fallbackEmailButton.hidden = false;
+    showStatus("Az automatikus küldés nem sikerült. Nyomd meg a „Küldés e-mail alkalmazással” gombot.", "pending");
   } finally {
     button.disabled = false;
     button.textContent = editingId ? "Módosítás mentése" : "Munkalap elküldése";
@@ -430,7 +516,6 @@ fallbackEmailButton.addEventListener("click", () => {
     }
     fallbackEmailContext = { payload: buildEmailPayload(data, Boolean(editingId)), queueId: null, clearAfterReturn: false };
   }
-  if (fallbackEmailContext.queueId) updateQueueItem(fallbackEmailContext.queueId, { emailHandledManually: true });
   externalEmailInProgress = true;
   window.location.href = fallbackEmailUrl(fallbackEmailContext.payload);
 });
@@ -438,16 +523,25 @@ fallbackEmailButton.addEventListener("click", () => {
 function finishExternalEmail() {
   if (!externalEmailInProgress) return;
   externalEmailInProgress = false;
-  const shouldClear = fallbackEmailContext?.clearAfterReturn;
-  fallbackEmailContext = null;
-  if (shouldClear) {
-    resetForm();
-    $("#successDialog").showModal();
-  } else {
-    fallbackEmailButton.hidden = true;
-  }
-  syncQueue();
+  $("#fallbackConfirmDialog").showModal();
 }
+
+$("#fallbackSent").addEventListener("click", () => {
+  const context = fallbackEmailContext;
+  if (context?.queueId) updateQueueItem(context.queueId, { emailHandledManually: true });
+  $("#fallbackConfirmDialog").close();
+  fallbackEmailContext = null;
+  resetForm();
+  $("#successDialog").showModal();
+  syncQueue();
+});
+
+$("#fallbackNotSent").addEventListener("click", () => {
+  $("#fallbackConfirmDialog").close();
+  fallbackEmailButton.hidden = false;
+  showStatus("Az e-mail nem lett elküldve. Nyomd meg újra a „Küldés e-mail alkalmazással” gombot.", "pending");
+  syncQueue();
+});
 
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState !== "visible") return;
@@ -519,10 +613,17 @@ function worksheetCardHTML(item, office = false) {
   const subcontractor = subcontractorLine(data);
   const materials = filledMaterialItems(data);
   const rentals = filledRentals(data);
+  const officeStatus = {
+    database_delayed: "Az adatbázis-mentés csak késleltetett újrapróbálással sikerült.",
+    email_fallback: "Az automatikus e-mail-küldés elsőre nem sikerült.",
+    database_delayed_email_fallback: "Az adatbázis-mentés késett, és az automatikus e-mail-küldés sem sikerült elsőre."
+  }[data._officeStatus];
+  const canManagePending = session?.role === "manager" || Boolean(session?.delegatedBy);
   return `
     <article class="worksheet-card" data-id="${escapeHTML(item.id)}">
       <h3>Csapat: ${escapeHTML(item.leader)}</h3>
-      ${item.pending ? `<p class="pending-record"><b>Küldésre vár</b> – a telefon megőrzi, és internetkapcsolatnál újrapróbálja.</p>` : ""}
+      ${item.pending && canManagePending ? `<p class="pending-record"><b>Feldolgozásra vár</b> – a részletes állapot a lista felett látható.</p>` : ""}
+      ${office && officeStatus ? `<p class="pending-record"><b>Irodai figyelmeztetés:</b> ${escapeHTML(officeStatus)}</p>` : ""}
       ${listHTML(teams, "team-summary")}
       ${subcontractor ? `<p><b>Alvállalkozó:</b> ${escapeHTML(subcontractor)}</p>` : ""}
       ${item.customer ? `<p><b>Ügyfél:</b> ${escapeHTML(item.customer)}</p>` : ""}
@@ -531,7 +632,7 @@ function worksheetCardHTML(item, office = false) {
       ${materials.length ? `<div class="summary-group"><b>Tételek:</b>${listHTML(materials)}</div>` : ""}
       ${rentals.length ? `<div class="summary-group"><b>Gépbérlés:</b>${listHTML(rentals)}</div>` : ""}
       <div class="card-actions">
-        ${item.pending ? "" : `<button type="button" data-edit="${escapeHTML(item.id)}">Megnyitás / Szerkesztés</button>`}
+        ${item.pending ? (canManagePending ? `<button class="delete-button" type="button" data-cancel-queue="${escapeHTML(item.pendingQueueId)}">Várakozó példány törlése</button>` : "") : `<button type="button" data-edit="${escapeHTML(item.id)}">Megnyitás / Szerkesztés</button>`}
         ${office ? `<button type="button" data-print="${escapeHTML(item.id)}">PDF / Nyomtatás</button>` : ""}
         ${office && !item.pending ? `<button class="delete-button" type="button" data-delete="${escapeHTML(item.id)}">Törlés</button>` : ""}
       </div>
@@ -550,6 +651,7 @@ function ownRecentWorksheets() {
     .map(item => ({
       ...item.record,
       pending: true,
+      pendingQueueId: item.queueId,
       createdAt: item.queuedAt || new Date().toISOString(),
       updatedAt: item.queuedAt || new Date().toISOString()
     }));
@@ -631,7 +733,7 @@ async function loadDatabaseUsage() {
 async function loadWorksheets(showErrors = true) {
   if (!session) return;
   try {
-    const recent = await MunkalapDB.listRecent();
+    const recent = await MunkalapDB.listRecent(session.userId);
     if (officeLoaded) {
       const byId = new Map(worksheets.map(item => [item.id, item]));
       recent.forEach(item => byId.set(item.id, item));
@@ -690,8 +792,24 @@ function openWorksheetForEdit(id) {
 
 $("#recentWorksheets").addEventListener("click", event => {
   const button = event.target.closest("[data-edit]");
+  const cancelQueue = event.target.closest("[data-cancel-queue]");
   if (button) openWorksheetForEdit(button.dataset.edit);
+  if (cancelQueue) cancelQueuedWorksheet(cancelQueue.dataset.cancelQueue);
 });
+
+function cancelQueuedWorksheet(queueId) {
+  const item = readQueue().find(entry => entry.queueId === queueId);
+  if (!item) return;
+  const label = `${item.record?.leader || "Munkalap"} – ${item.record?.customer || "Nincs ügyfél"}`;
+  if (!confirm(`Biztosan törlöd ezt a várakozó példányt?\n\n${label}\n\nA rendszer ezután nem próbálja újra elküldeni vagy elmenteni.`)) return;
+  removeQueueItem(queueId);
+  if (pendingCurrentQueueId === queueId) pendingCurrentQueueId = null;
+  if (fallbackEmailContext?.queueId === queueId) {
+    fallbackEmailContext = null;
+    fallbackEmailButton.hidden = true;
+  }
+  showStatus("A várakozó példányt töröltük. Más munkalaphoz nem nyúltunk.", "success");
+}
 
 $("#officeWorksheets").addEventListener("click", event => {
   const edit = event.target.closest("[data-edit]");
@@ -903,16 +1021,20 @@ function renderProfileOptions() {
 $("#profileSelect").addEventListener("change", event => {
   selectedProfile = event.target.value;
   const hasSelection = Boolean(selectedProfile);
-  $("#pinFieldWrap").hidden = !hasSelection;
+  const remembered = hasSelection && MunkalapDB.hasRememberedLogin(selectedProfile);
+  $("#pinFieldWrap").hidden = !hasSelection || remembered;
+  $("#pinField").value = "";
   $("#enterButton").disabled = !hasSelection;
-  if (hasSelection) $("#pinField").focus();
+  $("#loginStatus").textContent = remembered ? "Ezt a nevet ez az eszköz már megjegyezte." : "";
+  if (hasSelection && !remembered) $("#pinField").focus();
 });
 
 async function login() {
   const pin = $("#pinField").value;
   const status = $("#loginStatus");
   const button = $("#enterButton");
-  if (!selectedProfile || pin.length < 6) {
+  const remembered = selectedProfile && MunkalapDB.hasRememberedLogin(selectedProfile);
+  if (!selectedProfile || (!remembered && pin.length < 6)) {
     status.textContent = "Válaszd ki a neved, és add meg a legalább 6 számjegyű PIN-kódot.";
     return;
   }
@@ -924,6 +1046,10 @@ async function login() {
     await openApp(profile);
   } catch (error) {
     status.textContent = error.message || "A belépés nem sikerült.";
+    if (!MunkalapDB.hasRememberedLogin(selectedProfile)) {
+      $("#pinFieldWrap").hidden = false;
+      $("#pinField").focus();
+    }
   } finally {
     button.disabled = false;
     button.textContent = "Belépés";
@@ -939,7 +1065,9 @@ async function openApp(profile) {
   officeLoading = false;
   $("#loginView").hidden = true;
   $("#appView").hidden = false;
-  $("#activeUser").textContent = `Belépve: ${profile.name}`;
+  $("#activeUser").textContent = profile.delegatedBy
+    ? `Kitöltés: ${profile.name} · Irodai eszköz: ${profile.delegatedBy}`
+    : `Belépve: ${profile.name}`;
   $("#previewBanner").hidden = !LOCAL_PREVIEW;
   $("#managerTabs").hidden = profile.role !== "manager";
   resetForm();
@@ -996,8 +1124,13 @@ $("#reloadHistory").addEventListener("click", async () => {
     await loadWorksheets();
     updateQueueNotice();
     const waiting = ownQueue().length;
-    if (waiting) {
-      showStatus(`${waiting} munkalap továbbra is küldésre vár. Próbáld meg újra stabil internetkapcsolattal.`, "pending");
+    if (waiting && (session.role === "manager" || session.delegatedBy)) {
+      const pending = ownQueue();
+      const databaseWaiting = pending.filter(item => !item.databaseSaved).length;
+      const emailWaiting = pending.filter(item => !item.emailSent && !item.emailHandledManually).length;
+      showStatus(`${waiting} munkalap feldolgozása még nem teljes: ${databaseWaiting} adatbázis-mentés és ${emailWaiting} e-mail-küldés vár. A részletes hiba a Munkalapjaim felett látható.`, "pending");
+    } else if (waiting) {
+      showStatus("A munkalapok frissítése folyamatban van. Az alkalmazás automatikusan folytatja.", "pending");
     } else {
       showStatus("A munkalapok frissítve.", "success");
     }
@@ -1070,22 +1203,32 @@ dateField.addEventListener("blur", () => { if (toDateInputValue(dateField.value)
 
 const installDialog = $("#installDialog");
 const isInstalled = () => window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+const isIosDevice = () => /iphone|ipad|ipod/i.test(navigator.userAgent);
+const isAndroidDevice = () => /android/i.test(navigator.userAgent);
+const isMobileDevice = () => isIosDevice() || isAndroidDevice() || window.matchMedia("(max-width: 760px)").matches;
 function showInstallMessage(title, message) {
   $("#installDialogTitle").textContent = title;
   $("#installDialogText").textContent = message;
   installDialog.showModal();
 }
 window.addEventListener("beforeinstallprompt", event => { event.preventDefault(); installPrompt = event; });
-window.addEventListener("appinstalled", () => { installPrompt = null; showInstallMessage("Sikeres telepítés", "A Munkalap alkalmazás telepítve van a telefonodra."); });
+window.addEventListener("appinstalled", () => { installPrompt = null; showInstallMessage("Sikeres telepítés", `A Munkalap alkalmazás telepítve van ${isMobileDevice() ? "a telefonodra" : "a számítógépedre"}.`); });
 $("#installDialogClose").addEventListener("click", () => installDialog.close());
 $("#installButton").addEventListener("click", async () => {
-  if (isInstalled()) { showInstallMessage("Már telepítve van", "A Munkalap alkalmazás már telepítve van ezen a telefonon."); return; }
+  if (isInstalled()) { showInstallMessage("Már telepítve van", `A Munkalap alkalmazás már telepítve van ${isMobileDevice() ? "ezen a telefonon" : "ezen a számítógépen"}.`); return; }
   if (installPrompt) { installPrompt.prompt(); await installPrompt.userChoice; installPrompt = null; return; }
-  const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
-  showInstallMessage("Munkalap telepítése", isIos
-    ? "Nyomd meg a böngésző Megosztás gombját, majd válaszd a Főképernyőhöz adás lehetőséget."
-    : "Nyisd meg a böngésző menüjét, majd válaszd az Alkalmazás telepítése vagy a Főképernyőhöz adás lehetőséget.");
+  let message;
+  if (isIosDevice()) {
+    message = "Telepítés iPhone-ra:\n\n1. Nyisd meg ezt az oldalt Safariban.\n2. Nyomd meg a négyzetből felfelé mutató nyíl ikont.\n3. Válaszd a Hozzáadás a Főképernyőhöz lehetőséget.\n4. Nyomd meg a Hozzáadás gombot.";
+  } else if (isAndroidDevice()) {
+    message = "Nyomd meg a böngésző jobb felső menüjét (⋮), majd válaszd az Alkalmazás telepítése vagy a Hozzáadás a kezdőképernyőhöz lehetőséget.";
+  } else {
+    message = "A számítógépen kattints a címsor Telepítés ikonjára, vagy a böngésző menüjében válaszd az Alkalmazás telepítése lehetőséget.";
+  }
+  showInstallMessage("Munkalap telepítése", message);
 });
+
+$("#installButton").textContent = isMobileDevice() ? "Telepítés telefonra" : "Telepítés számítógépre";
 
 $("#refreshButton").addEventListener("click", async () => {
   if (!navigator.onLine) { showInstallMessage("Nincs internetkapcsolat", "A frissítéshez internetkapcsolat szükséges."); return; }

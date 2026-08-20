@@ -51,6 +51,8 @@ create table if not exists munkalap.worksheets (
 
 create index if not exists worksheets_user_created_idx
   on munkalap.worksheets (user_id, created_at desc, id desc);
+create index if not exists worksheets_user_work_date_idx
+  on munkalap.worksheets (user_id, work_date desc, created_at desc, id desc);
 create index if not exists worksheets_date_idx
   on munkalap.worksheets (work_date desc);
 create index if not exists worksheets_leader_idx
@@ -88,7 +90,7 @@ as $$
       select id
       from munkalap.worksheets
       where user_id = (select auth.uid())
-      order by created_at desc, id desc
+      order by work_date desc, created_at desc, id desc
       limit 10
     ) recent
     where recent.id = row_id
