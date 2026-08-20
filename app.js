@@ -1,7 +1,7 @@
 const EMAIL_ENDPOINT = "https://formsubmit.co/ajax/info@diszkertek.hu";
 const EMAIL_RECIPIENT = "info@diszkertek.hu";
 const STABLE_APP_URL = "https://agnesgeller.github.io/diszkertek-munkalap/";
-const APP_VERSION = "20";
+const APP_VERSION = "21";
 const QUEUE_KEY = "diszkertek-munkalap-send-queue-v1";
 const MANAGER_VIEW_KEY = "diszkertek-munkalap-manager-view-v1";
 const DATABASE_FREE_LIMIT = 500 * 1024 * 1024;
@@ -253,7 +253,23 @@ function readQueue() {
   if (LOCAL_PREVIEW) return [];
   try {
     const queue = JSON.parse(localStorage.getItem(QUEUE_KEY));
-    return Array.isArray(queue) ? queue : [];
+    if (!Array.isArray(queue)) return [];
+
+    // A korábbi verziókból vagy félbeszakadt tárhelyírásból maradt hibás
+    // elemek ne tudják megakasztani a teljes várólista feldolgozását.
+    const validQueue = queue.filter(item =>
+      item &&
+      typeof item === "object" &&
+      typeof item.queueId === "string" &&
+      item.queueId &&
+      item.record &&
+      typeof item.record === "object"
+    );
+    if (validQueue.length !== queue.length) {
+      try { localStorage.setItem(QUEUE_KEY, JSON.stringify(validQueue)); }
+      catch (_) { /* A használható elemek ettől még feldolgozhatók. */ }
+    }
+    return validQueue;
   }
   catch (_) { return []; }
 }
@@ -368,7 +384,10 @@ async function syncQueue() {
           item.lastError = error?.message || "Az irodai állapot mentése nem sikerült";
         }
       }
-      if (!item.emailSent && !item.emailHandledManually) {
+      const fallbackDecisionPending =
+        fallbackEmailContext?.queueId === item.queueId &&
+        (externalEmailInProgress || $("#fallbackConfirmDialog").open);
+      if (!item.emailSent && !item.emailHandledManually && !fallbackDecisionPending) {
         try {
           await sendEmail(item.emailPayload);
           item.emailSent = true;
@@ -640,7 +659,10 @@ function worksheetCardHTML(item, office = false) {
 }
 
 function sortedByCreated(items) {
-  return [...items].sort((first, second) => String(second.createdAt || "").localeCompare(String(first.createdAt || "")) || second.date.localeCompare(first.date));
+  return [...items].sort((first, second) =>
+    String(second?.createdAt || "").localeCompare(String(first?.createdAt || "")) ||
+    String(second?.date || "").localeCompare(String(first?.date || ""))
+  );
 }
 
 function ownRecentWorksheets() {
@@ -1009,7 +1031,11 @@ $("#clearFilters").addEventListener("click", () => {
   renderOffice();
 });
 
-function renderProfileOptions() {
+function renderProfileOptions(lockedName = "") {
+  if (lockedName) {
+    $("#profileSelect").innerHTML = `<option value="${escapeHTML(lockedName)}">${escapeHTML(lockedName)}</option>`;
+    return;
+  }
   const options = LEADERS
     .slice()
     .sort((first, second) => first.localeCompare(second, "hu"))
@@ -1025,7 +1051,7 @@ $("#profileSelect").addEventListener("change", event => {
   $("#pinFieldWrap").hidden = !hasSelection || remembered;
   $("#pinField").value = "";
   $("#enterButton").disabled = !hasSelection;
-  $("#loginStatus").textContent = remembered ? "Ezt a nevet ez az eszköz már megjegyezte." : "";
+  $("#loginStatus").textContent = "";
   if (hasSelection && !remembered) $("#pinField").focus();
 });
 
@@ -1065,9 +1091,11 @@ async function openApp(profile) {
   officeLoading = false;
   $("#loginView").hidden = true;
   $("#appView").hidden = false;
-  $("#activeUser").textContent = profile.delegatedBy
-    ? `Kitöltés: ${profile.name} · Irodai eszköz: ${profile.delegatedBy}`
-    : `Belépve: ${profile.name}`;
+  $("#activeUser").textContent = "";
+  $("#activeUser").hidden = true;
+  const canSwitchProfile = profile.role === "manager" || Boolean(profile.delegatedBy);
+  $("#logoutButton").hidden = false;
+  $("#logoutButton").textContent = canSwitchProfile ? "Kilépés / Névváltás" : "Kilépés";
   $("#previewBanner").hidden = !LOCAL_PREVIEW;
   $("#managerTabs").hidden = profile.role !== "manager";
   resetForm();
@@ -1096,6 +1124,8 @@ async function openApp(profile) {
 
 async function logout() {
   if (formDirty && !confirm("A kijelentkezés törli a most beírt adatokat. Biztosan kijelentkezel?")) return;
+  const previousSession = session;
+  const canSwitchProfile = previousSession?.role === "manager" || Boolean(previousSession?.delegatedBy);
   await MunkalapDB.logout();
   session = null;
   worksheets = [];
@@ -1103,11 +1133,14 @@ async function logout() {
   officeLoading = false;
   $("#appView").hidden = true;
   $("#loginView").hidden = false;
-  selectedProfile = "";
-  $("#profileSelect").value = "";
+  selectedProfile = canSwitchProfile ? "" : previousSession?.name || "";
+  renderProfileOptions(canSwitchProfile ? "" : selectedProfile);
+  $("#profileSelect").value = selectedProfile;
   $("#pinField").value = "";
-  $("#pinFieldWrap").hidden = true;
-  $("#enterButton").disabled = true;
+  const rememberedOwnLogin = selectedProfile && MunkalapDB.hasRememberedLogin(selectedProfile);
+  $("#pinFieldWrap").hidden = !selectedProfile || rememberedOwnLogin;
+  $("#enterButton").disabled = !selectedProfile;
+  $("#loginStatus").textContent = "";
 }
 
 $("#logoutButton").addEventListener("click", logout);

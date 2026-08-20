@@ -31,12 +31,16 @@
   let previewWorksheets = [];
 
   function readRememberedSessions() {
-    try { return JSON.parse(localStorage.getItem(DEVICE_SESSIONS_KEY)) || {}; }
+    try {
+      const sessions = JSON.parse(localStorage.getItem(DEVICE_SESSIONS_KEY));
+      return sessions && typeof sessions === "object" && !Array.isArray(sessions) ? sessions : {};
+    }
     catch (_) { return {}; }
   }
 
   function writeRememberedSessions(sessions) {
-    localStorage.setItem(DEVICE_SESSIONS_KEY, JSON.stringify(sessions));
+    try { localStorage.setItem(DEVICE_SESSIONS_KEY, JSON.stringify(sessions)); }
+    catch (_) { /* A belépés tárhelykorlátozás esetén is folytatódhat. */ }
   }
 
   function rememberSession(currentSession) {
@@ -48,7 +52,8 @@
       refresh_token: currentSession.refresh_token
     };
     writeRememberedSessions(sessions);
-    localStorage.setItem(DEVICE_SESSION_KEY, JSON.stringify(sessions[email]));
+    try { localStorage.setItem(DEVICE_SESSION_KEY, JSON.stringify(sessions[email])); }
+    catch (_) { /* A Supabase saját munkamenet-kezelése továbbra is működik. */ }
   }
 
   function forgetRememberedSession(name) {
@@ -182,7 +187,8 @@
       .single();
     if (error) throw error;
     const profile = { userId: data.id, name: data.display_name, role: data.role };
-    localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+    try { localStorage.setItem(PROFILE_KEY, JSON.stringify(profile)); }
+    catch (_) { /* A profil ettől még használható az aktuális munkamenetben. */ }
     return profile;
   }
 
@@ -252,7 +258,8 @@
           role: target.role,
           delegatedBy: managerProfile.name
         };
-        localStorage.setItem(PROFILE_KEY, JSON.stringify(delegated));
+        try { localStorage.setItem(PROFILE_KEY, JSON.stringify(delegated)); }
+        catch (_) { /* A névváltás ettől még használható az aktuális munkamenetben. */ }
         return delegated;
       } else {
         const signedIn = await client.auth.signInWithPassword({ email, password: pin });

@@ -6,13 +6,13 @@
   <meta name="theme-color" content="#315f37">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Munkalap">
-  <link rel="manifest" href="manifest.webmanifest?v=20">
+  <link rel="manifest" href="manifest.webmanifest?v=21">
   <link rel="icon" href="munkalap-m-favicon-v12.ico" sizes="any">
   <link rel="icon" href="munkalap-m-icon-32-v12.png" type="image/png" sizes="32x32">
   <link rel="apple-touch-icon" href="munkalap-m-icon-apple-180-v12.png">
-  <link rel="stylesheet" href="styles.css?v=20">
-  <link rel="stylesheet" href="logo-overrides.css?v=20">
-  <link rel="stylesheet" href="app-shell.css?v=20">
+  <link rel="stylesheet" href="styles.css?v=21">
+  <link rel="stylesheet" href="logo-overrides.css?v=21">
+  <link rel="stylesheet" href="app-shell.css?v=21">
   <title>Díszkertek – Napi munkalap</title>
 </head>
 <body>
@@ -33,7 +33,6 @@
       </label>
       <button id="enterButton" class="primary-button" type="button" disabled>Belépés</button>
       <p id="loginStatus" class="login-status" role="status" aria-live="polite"></p>
-      <small>A PIN-kódot csak az első belépéskor kell megadni ezen a telefonon.</small>
     </section>
   </main>
 
@@ -44,11 +43,11 @@
       <p class="kicker">Kertfenntartási munkák nyilvántartása</p>
       <h1>NAPI MUNKALAP</h1>
       <p class="year">2026</p>
-      <p id="activeUser" class="active-user"></p>
+      <p id="activeUser" class="active-user" hidden></p>
       <div class="header-actions">
         <button id="installButton" type="button">Telepítés</button>
         <button id="refreshButton" type="button">Frissítés</button>
-        <button id="logoutButton" type="button">Név váltás</button>
+        <button id="logoutButton" type="button" hidden>Kilépés</button>
       </div>
     </header>
 
@@ -170,9 +169,9 @@
   </dialog>
   <dialog id="successDialog"><h2>Köszönöm, hogy beküldted a Munkalapot 😊</h2><p>Nagyon Cuki vagy ❤️</p><button id="newWorksheet" type="button">Új munkalap</button></dialog>
 
-  <script src="supabase.js?v=20"></script>
-  <script src="supabase-config.js?v=20"></script>
-  <script src="munkalap-data.js?v=20"></script>
-  <script src="app.js?v=20"></script>
+  <script src="supabase.js?v=21"></script>
+  <script src="supabase-config.js?v=21"></script>
+  <script src="munkalap-data.js?v=21"></script>
+  <script src="app.js?v=21"></script>
 </body>
 </html>
