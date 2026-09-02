@@ -28,7 +28,6 @@ select
     when 'attila@munkalap.diszkertek.hu' then 'Attila'
     when 'bendeguz@munkalap.diszkertek.hu' then 'Bendegúz'
     when 'gabor@munkalap.diszkertek.hu' then 'Gábor'
-    when 'marci@munkalap.diszkertek.hu' then 'Marci'
     when 'mark@munkalap.diszkertek.hu' then 'Márk'
     when 'tamas@munkalap.diszkertek.hu' then 'Tamás'
   end,
@@ -46,7 +45,6 @@ where lower(email) in (
   'attila@munkalap.diszkertek.hu',
   'bendeguz@munkalap.diszkertek.hu',
   'gabor@munkalap.diszkertek.hu',
-  'marci@munkalap.diszkertek.hu',
   'mark@munkalap.diszkertek.hu',
   'tamas@munkalap.diszkertek.hu'
 )
@@ -55,4 +53,3 @@ set display_name = excluded.display_name,
     role = excluded.role;
 
 commit;
-

@@ -8,7 +8,6 @@
     "Attila": "attila@munkalap.diszkertek.hu",
     "Bendegúz": "bendeguz@munkalap.diszkertek.hu",
     "Gábor": "gabor@munkalap.diszkertek.hu",
-    "Marci": "marci@munkalap.diszkertek.hu",
     "Márk": "mark@munkalap.diszkertek.hu",
     "Tamás": "tamas@munkalap.diszkertek.hu"
   };
@@ -186,6 +185,10 @@
       .eq("id", user.id)
       .single();
     if (error) throw error;
+    if (!EMAILS[data?.display_name]) {
+      localStorage.removeItem(PROFILE_KEY);
+      throw new Error("Ez a felhasználó már nem jogosult a MUNKALAP használatára.");
+    }
     const profile = { userId: data.id, name: data.display_name, role: data.role };
     try { localStorage.setItem(PROFILE_KEY, JSON.stringify(profile)); }
     catch (_) { /* A profil ettől még használható az aktuális munkamenetben. */ }
@@ -296,7 +299,9 @@
       }
       try {
         const cached = JSON.parse(localStorage.getItem(PROFILE_KEY));
-        if (cached?.userId === data.session.user.id || cached?.authUserId === data.session.user.id) return cached;
+        const sameUser = cached?.userId === data.session.user.id || cached?.authUserId === data.session.user.id;
+        if (sameUser && EMAILS[cached?.name]) return cached;
+        localStorage.removeItem(PROFILE_KEY);
       } catch (_) {
         localStorage.removeItem(PROFILE_KEY);
       }

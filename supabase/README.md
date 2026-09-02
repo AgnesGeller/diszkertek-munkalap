@@ -16,14 +16,13 @@ alkalmazástól elkülönített adatbázissémákban működik:
 5. Az **Integrations > Data API** beállításában az **Exposed schemas** listához
    add hozzá kizárólag a `munkalap` sémát. A `munkalap_private` sémát tilos
    hozzáadni.
-6. Az **Authentication > Users** oldalon hozd létre a MUNKALAP nyolc
+6. Az **Authentication > Users** oldalon hozd létre a MUNKALAP hét
    felhasználóját saját, legalább hatjegyű PIN-kóddal:
    - `adam@munkalap.diszkertek.hu`
    - `agi@munkalap.diszkertek.hu`
    - `attila@munkalap.diszkertek.hu`
    - `bendeguz@munkalap.diszkertek.hu`
    - `gabor@munkalap.diszkertek.hu`
-   - `marci@munkalap.diszkertek.hu`
    - `mark@munkalap.diszkertek.hu`
    - `tamas@munkalap.diszkertek.hu`
 7. Ezután futtasd egyszer a `munkalap-sync-users.sql` teljes tartalmát.
@@ -35,6 +34,10 @@ alkalmazástól elkülönített adatbázissémákban működik:
 felhasználó felvételekor a névlistát és a `munkalap-sync-users.sql` leképezését
 is frissíteni kell, majd a szinkronizálást ismét le kell futtatni.
 
+Kilépő dolgozó hozzáférését a saját eltávolító SQL-lel kell megszüntetni. Marci
+esetében ez a `munkalap-remove-marci.sql`. A profil törlése letiltja az adatbázis-
+hozzáférést, miközben a korábbi munkalapjai megmaradnak az Iroda számára.
+
 ## Adatvédelem
 
 - A dolgozó csak a saját legutóbbi 10 munkalapját tudja lekérni és módosítani.
@@ -45,4 +48,3 @@ is frissíteni kell, majd a szinkronizálást ismét le kell futtatni.
 - A `munkalap_private` séma nem kerülhet az Exposed schemas listába.
 - A felhasználói profilokat kézi szinkronizálás készíti; nincs az egész projektre
   ható Auth-trigger.
-

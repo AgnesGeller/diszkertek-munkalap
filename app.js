@@ -1,11 +1,11 @@
 const EMAIL_ENDPOINT = "https://formsubmit.co/ajax/info@diszkertek.hu";
 const EMAIL_RECIPIENT = "info@diszkertek.hu";
 const STABLE_APP_URL = "https://agnesgeller.github.io/diszkertek-munkalap/";
-const APP_VERSION = "21";
+const APP_VERSION = "22";
 const QUEUE_KEY = "diszkertek-munkalap-send-queue-v1";
 const MANAGER_VIEW_KEY = "diszkertek-munkalap-manager-view-v1";
 const DATABASE_FREE_LIMIT = 500 * 1024 * 1024;
-const LEADERS = ["Ádám", "Ági", "Attila", "Bendegúz", "Gábor", "Marci", "Márk", "Tamás"];
+const LEADERS = ["Ádám", "Ági", "Attila", "Bendegúz", "Gábor", "Márk", "Tamás"];
 const LOCAL_PREVIEW = Boolean(window.MunkalapDB?.previewMode);
 
 if (window.location.protocol === "file:") window.location.replace(STABLE_APP_URL);

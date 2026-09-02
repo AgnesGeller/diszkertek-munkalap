@@ -39,6 +39,11 @@ for select
 to authenticated
 using (
   (select auth.uid()) is not null
+  and exists (
+    select 1
+    from munkalap.profiles
+    where id = (select auth.uid())
+  )
   and (
     (select munkalap_private.is_manager())
     or user_id = (select auth.uid())
