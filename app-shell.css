@@ -59,6 +59,8 @@ button{font-family:Arial,sans-serif}
 .office-filters label{display:grid;gap:6px;color:var(--green);font:bold 13px Arial,sans-serif}
 .office-filters input,.office-filters select{width:100%;min-height:42px;padding:8px;border:1px solid var(--line);border-radius:9px;background:#fff;font:15px Arial,sans-serif}
 .office-filters button{align-self:end;min-height:42px}
+.office-filters label{min-width:0}
+.office-scope{font-weight:bold;color:var(--green);overflow-wrap:anywhere}
 .office-actions{display:flex;flex-wrap:wrap;gap:10px;margin:18px 0}
 .office-status{min-height:20px;margin:8px 0;color:var(--muted);font:13px/1.4 Arial,sans-serif}
 .office-status.error{color:#8c2923}.office-status.success{color:#286b36}
@@ -97,7 +99,7 @@ button{font-family:Arial,sans-serif}
   .history-section{margin-bottom:28px}
   .worksheet-card{padding:16px}
   .office-filters{grid-template-columns:1fr 1fr;padding:13px}
-  .office-filters label:nth-child(2),.office-filters label:nth-child(3){grid-column:1/-1}
+  .office-filters label:nth-child(2),.office-filters label:nth-child(3),.office-filters label:nth-child(4){grid-column:1/-1}
   .database-usage>div:first-child{display:grid}
   .office-actions button{flex:1}
   .customer-form-grid{grid-template-columns:1fr}.customer-form-grid .wide{grid-column:auto}.customer-card header{display:block}.customer-card header button{margin-top:10px}.customer-heading{display:block}.customer-heading button{margin-top:12px;width:100%}

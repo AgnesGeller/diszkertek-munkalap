@@ -1,7 +1,7 @@
 const EMAIL_ENDPOINT = "https://formsubmit.co/ajax/info@diszkertek.hu";
 const EMAIL_RECIPIENT = "info@diszkertek.hu";
 const STABLE_APP_URL = "https://agnesgeller.github.io/diszkertek-munkalap/";
-const APP_VERSION = "24";
+const APP_VERSION = "25";
 const QUEUE_KEY = "diszkertek-munkalap-send-queue-v1";
 const MANAGER_VIEW_KEY = "diszkertek-munkalap-manager-view-v1";
 const DATABASE_FREE_LIMIT = 500 * 1024 * 1024;
@@ -719,15 +719,61 @@ function renderRecent() {
   target.innerHTML = recent.length ? recent.map(item => worksheetCardHTML(item)).join("") : `<p class="empty-list">Még nincs beküldött munkalapod.</p>`;
 }
 
+function officeAddressKey(value) {
+  return String(value || "").trim().toLocaleLowerCase("hu-HU").replace(/[.,]/g, "").replace(/\s+/g, " ");
+}
+
+function officeLocationKey(item) {
+  if (item.locationId) return `location:${item.locationId}`;
+  const customer = customerDirectory.find(entry => item.customerId
+    ? entry.id === item.customerId
+    : customerNameKey(entry.fullName) === customerNameKey(item.customer));
+  const location = (customer?.locations || []).find(entry => officeAddressKey(entry.address) === officeAddressKey(item.address));
+  if (location) return `location:${location.id}`;
+  return `legacy:${JSON.stringify([item.customerId || customerNameKey(item.customer), officeAddressKey(item.address)])}`;
+}
+
+function officeLocationOptions(query = "") {
+  const needle = customerNameKey(query);
+  const options = new Map();
+  const matches = name => !needle || customerNameKey(name).includes(needle);
+  for (const customer of customerDirectory) {
+    if (!matches(customer.fullName)) continue;
+    for (const location of customer.locations || []) {
+      if (location.active === false) continue;
+      options.set(`location:${location.id}`, `${customer.fullName} — ${location.address}`);
+    }
+  }
+  for (const item of worksheets) {
+    const customer = customerDirectory.find(entry => entry.id === item.customerId);
+    const name = customer?.fullName || item.customer;
+    if (!matches(name) && !matches(item.customer)) continue;
+    const key = officeLocationKey(item);
+    if (!options.has(key)) options.set(key, `${name} — ${item.address || "Helyszín nincs megadva"}`);
+  }
+  return [...options].map(([value, label]) => ({ value, label })).sort((a, b) => a.label.localeCompare(b.label, "hu"));
+}
+
+function renderOfficeLocations() {
+  const select = $("#filterLocation");
+  const selected = select.value;
+  const options = officeLocationOptions($("#filterCustomer").value);
+  const oneCustomer = new Set(options.map(option => option.label.split(" — ")[0])).size === 1;
+  select.innerHTML = `<option value="">Minden helyszín</option>${options.map(option => `<option value="${escapeHTML(option.value)}" data-full-label="${escapeHTML(option.label)}">${escapeHTML(oneCustomer ? option.label.split(" — ").slice(1).join(" — ") : option.label)}</option>`).join("")}`;
+  select.value = options.some(option => option.value === selected) ? selected : "";
+}
+
 function filteredOfficeWorksheets() {
   const leader = $("#filterLeader").value;
   const customer = $("#filterCustomer").value.trim().toLocaleLowerCase("hu-HU");
   const address = $("#filterAddress").value.trim().toLocaleLowerCase("hu-HU");
   const from = $("#filterFrom").value;
   const to = $("#filterTo").value;
+  const location = $("#filterLocation").value;
   return [...worksheets]
     .filter(item => !leader || item.leader === leader)
-    .filter(item => !customer || item.customer.toLocaleLowerCase("hu-HU").includes(customer))
+    .filter(item => !customer || String(item.customer || "").toLocaleLowerCase("hu-HU").includes(customer) || customerNameKey(customerDirectory.find(entry => entry.id === item.customerId)?.fullName).includes(customerNameKey(customer)))
+    .filter(item => !location || officeLocationKey(item) === location)
     .filter(item => !address || item.address.toLocaleLowerCase("hu-HU").includes(address))
     .filter(item => !from || item.date >= from)
     .filter(item => !to || item.date <= to)
@@ -736,7 +782,11 @@ function filteredOfficeWorksheets() {
 
 function renderOffice() {
   if (session?.role !== "manager") return;
+  renderOfficeLocations();
   const filtered = filteredOfficeWorksheets();
+  const location = $("#filterLocation");
+  $("#officeScope").textContent = location.value ? location.selectedOptions[0].dataset.fullLabel : "";
+  $("#officeScope").hidden = !location.value;
   $("#officeCount").textContent = `${filtered.length} munkalap`;
   $("#officeWorksheets").innerHTML = filtered.length ? filtered.map(item => worksheetCardHTML(item, true)).join("") : `<p class="empty-list">Nincs a szűrésnek megfelelő munkalap.</p>`;
 }
@@ -844,6 +894,7 @@ async function loadCustomers(manager = session?.role === "manager", showErrors =
     customersLoaded = true;
     renderCustomers();
     updateSuggestions();
+    if (manager) renderOffice();
     if (manager) $("#customersStatus").textContent = "";
   } catch (error) {
     if (session !== loadingSession) return;
@@ -1276,6 +1327,7 @@ $("#archivePreviousYear").addEventListener("click", archivePreviousYear);
 $("#exportPdf").addEventListener("click", printOfficeList);
 
 $("#filterLeader").addEventListener("change", renderOffice);
+$("#filterLocation").addEventListener("change", renderOffice);
 [$("#filterFrom"), $("#filterTo")].forEach(element => element.addEventListener("change", () => {
   officeWeekActive = false;
   $("#officeWeekLabel").textContent = "Egyéni időszak";
@@ -1286,6 +1338,7 @@ $("#clearFilters").addEventListener("click", () => {
   $("#filterLeader").value = "";
   $("#filterCustomer").value = "";
   $("#filterAddress").value = "";
+  $("#filterLocation").value = "";
   $("#filterFrom").value = "";
   $("#filterTo").value = "";
   officeWeekActive = false;
