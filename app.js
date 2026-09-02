@@ -1,7 +1,7 @@
 const EMAIL_ENDPOINT = "https://formsubmit.co/ajax/info@diszkertek.hu";
 const EMAIL_RECIPIENT = "info@diszkertek.hu";
 const STABLE_APP_URL = "https://agnesgeller.github.io/diszkertek-munkalap/";
-const APP_VERSION = "23";
+const APP_VERSION = "24";
 const QUEUE_KEY = "diszkertek-munkalap-send-queue-v1";
 const MANAGER_VIEW_KEY = "diszkertek-munkalap-manager-view-v1";
 const DATABASE_FREE_LIMIT = 500 * 1024 * 1024;
@@ -57,6 +57,8 @@ let officeWeekStart = startOfOfficeWeek(new Date());
 let officeWeekActive = true;
 let managerView = "worksheet";
 let customerDirectory = [];
+let customerLetter = "";
+const CUSTOMER_LETTERS = [..."ABCDEFGHIJKLMNOPQRSTUVWXYZ", "#"];
 let customersLoaded = false;
 let customersLoading = false;
 let selectedCustomerId = null;
@@ -778,9 +780,10 @@ function customerMatches(query, addressOnly = false) {
     const activeLocations = (customer.locations || []).filter(location => location.active !== false);
     const locations = activeLocations.length ? activeLocations : [{ id: "", address: "" }];
     for (const location of locations) {
-      const nameMatch = customerNameKey(customer.fullName).includes(needle);
+      const name = customerNameKey(customer.fullName);
+      const nameMatch = name.startsWith(needle) || name.split(" ").some(part => part.startsWith(needle));
       const addressMatch = String(location.address || "").toLocaleLowerCase("hu-HU").includes(needle);
-      if ((addressOnly && addressMatch) || (!addressOnly && (nameMatch || addressMatch))) {
+      if ((addressOnly && addressMatch) || (!addressOnly && nameMatch)) {
         matches.push({ customerId: customer.id, locationId: location.id, name: customer.fullName, address: location.address });
       }
     }
@@ -851,24 +854,33 @@ async function loadCustomers(manager = session?.role === "manager", showErrors =
   }
 }
 
-function billingModeLabel(mode) {
-  return ({ flat_monthly: "Havi átalány", monthly_grouped: "Havi összesítő", per_job: "Munkánként", manual: "Egyedi" })[mode] || "Munkánként";
+function customerInitial(name) {
+  const initial = String(name || "").trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().charAt(0);
+  return /^[A-Z]$/.test(initial) ? initial : "#";
+}
+
+function customerListPage(customers, query, letter) {
+  const available = new Set(customers.map(customer => customerInitial(customer.fullName)));
+  const selected = available.has(letter) ? letter : CUSTOMER_LETTERS.find(value => available.has(value)) || "";
+  const needle = String(query || "").trim().toLocaleLowerCase("hu-HU");
+  const filtered = customers.filter(customer => {
+    if (!needle) return customerInitial(customer.fullName) === selected;
+    const searchable = [customer.fullName, customer.email, customer.phone, customer.contactName, ...(customer.locations || []).filter(location => location.active !== false).map(location => location.address)].join(" ").toLocaleLowerCase("hu-HU");
+    return searchable.includes(needle);
+  }).sort((a, b) => a.fullName.localeCompare(b.fullName, "hu-HU"));
+  return { available, selected, filtered, searching: Boolean(needle) };
 }
 
 function renderCustomers() {
   if (session?.role !== "manager") return;
-  const needle = String($("#customerSearch").value || "").trim().toLocaleLowerCase("hu-HU");
-  const filtered = customerDirectory.filter(customer => {
-    const searchable = [customer.fullName, customer.email, customer.phone, customer.contactName, ...(customer.locations || []).map(location => location.address)].join(" ").toLocaleLowerCase("hu-HU");
-    return !needle || searchable.includes(needle);
-  });
-  $("#customersCount").textContent = `${filtered.length} ügyfél`;
+  const { available, selected, filtered, searching } = customerListPage(customerDirectory, $("#customerSearch").value, customerLetter);
+  customerLetter = selected;
+  $("#customerAlphabet").innerHTML = CUSTOMER_LETTERS.filter(letter => letter !== "#" || available.has(letter)).map(letter => `<button type="button" data-customer-letter="${letter}" aria-label="${letter} betűs ügyfelek" aria-pressed="${!searching && letter === selected}" ${available.has(letter) ? "" : "disabled"}>${letter}</button>`).join("");
+  $("#customersCount").textContent = `${filtered.length} / ${customerDirectory.length} ügyfél`;
   $("#customersList").innerHTML = filtered.length ? filtered.map(customer => `
     <article class="customer-card">
       <header><div><h3>${escapeHTML(customer.fullName)}</h3><div class="customer-meta">
-        <span class="customer-badge ${customer.reviewStatus === "pending" ? "pending" : ""}">${customer.reviewStatus === "approved" ? "Jóváhagyott" : "Ellenőrzésre vár"}</span>
         ${customer.active ? "" : `<span class="customer-badge inactive">Inaktív</span>`}
-        <span class="customer-badge">${escapeHTML(billingModeLabel(customer.billingMode))}</span>
       </div></div><button type="button" data-customer-edit="${escapeHTML(customer.id)}">Szerkesztés</button></header>
       ${(customer.locations || []).some(location => location.active !== false) ? `<p><b>Helyszínek:</b> ${(customer.locations || []).filter(location => location.active !== false).map(location => escapeHTML(location.address)).join(" · ")}</p>` : `<p><b>Helyszín:</b> még nincs megadva</p>`}
       ${customer.email || customer.phone ? `<p><b>Kapcsolat:</b> ${escapeHTML([customer.email, customer.phone].filter(Boolean).join(" · "))}</p>` : ""}
@@ -898,6 +910,14 @@ function openCustomerDialog(customer = null) {
 }
 
 $("#customerSearch").addEventListener("input", renderCustomers);
+$("#customerAlphabet").addEventListener("click", event => {
+  const button = event.target.closest("button[data-customer-letter]");
+  if (!button || button.disabled) return;
+  customerLetter = button.dataset.customerLetter;
+  $("#customerSearch").value = "";
+  renderCustomers();
+  $("#customerAlphabet").querySelector(`[data-customer-letter="${customerLetter}"]`)?.focus({ preventScroll: true });
+});
 $("#newCustomer").addEventListener("click", () => openCustomerDialog());
 $("#customerCancel").addEventListener("click", () => $("#customerDialog").close());
 $("#customersList").addEventListener("click", async event => {
@@ -949,6 +969,8 @@ $("#customerForm").addEventListener("submit", async event => {
   $("#customerDialogStatus").textContent = "Mentés…";
   try {
     await MunkalapDB.saveCustomer(payload);
+    customerLetter = customerInitial(payload.fullName);
+    $("#customerSearch").value = "";
     $("#customerDialog").close();
     customersLoaded = false;
     await loadCustomers(true, true);
@@ -1327,6 +1349,9 @@ $("#pinField").addEventListener("keydown", event => { if (event.key === "Enter")
 
 async function openApp(profile) {
   session = profile;
+  customerLetter = "";
+  $("#customerAlphabet").innerHTML = "";
+  $("#customerSearch").value = "";
   $("#customerDialog").close();
   $("#customerForm").reset();
   $("#customersList").innerHTML = "";

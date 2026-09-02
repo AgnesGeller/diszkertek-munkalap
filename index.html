@@ -6,13 +6,13 @@
   <meta name="theme-color" content="#315f37">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Munkalap">
-  <link rel="manifest" href="manifest.webmanifest?v=23">
+  <link rel="manifest" href="manifest.webmanifest?v=24">
   <link rel="icon" href="munkalap-m-favicon-v12.ico" sizes="any">
   <link rel="icon" href="munkalap-m-icon-32-v12.png" type="image/png" sizes="32x32">
   <link rel="apple-touch-icon" href="munkalap-m-icon-apple-180-v12.png">
-  <link rel="stylesheet" href="styles.css?v=23">
-  <link rel="stylesheet" href="logo-overrides.css?v=23">
-  <link rel="stylesheet" href="app-shell.css?v=23">
+  <link rel="stylesheet" href="styles.css?v=24">
+  <link rel="stylesheet" href="logo-overrides.css?v=24">
+  <link rel="stylesheet" href="app-shell.css?v=24">
   <title>Díszkertek – Napi munkalap</title>
   <meta name="description" content="Díszkertek napi munkalapok és ügyfélnyilvántartás.">
   <meta property="og:title" content="Díszkertek – Napi munkalap">
@@ -122,10 +122,11 @@
 
     <section id="customersView" class="customers-view" hidden>
       <div class="section-heading customer-heading">
-        <div><h2>Ügyfélnyilvántartás</h2><p>A dolgozók csak a jóváhagyott teljes nevet és címet látják.</p></div>
+        <div><h2>Ügyfélnyilvántartás</h2></div>
         <button id="newCustomer" class="primary-button" type="button">Új ügyfél</button>
       </div>
       <label class="customer-search"><span>Ügyfél keresése</span><input id="customerSearch" type="search" autocomplete="off" placeholder="Név, cím, e-mail vagy telefonszám"></label>
+      <nav id="customerAlphabet" class="customer-alphabet" aria-label="Ügyfelek kezdőbetű szerint"></nav>
       <p id="customersStatus" class="office-status" role="status" aria-live="polite"></p>
       <p id="customersCount" class="office-count"></p>
       <div id="customersList" class="customer-list"></div>
@@ -198,11 +199,11 @@
         <label>E-mail<input name="email" type="email"></label>
         <label>Telefonszám<input name="phone" type="tel"></label>
         <label>Adószám<input name="taxNumber"></label>
-        <label>Elszámolás<select name="billingMode"><option value="per_job">Munkánként</option><option value="monthly_grouped">Havi összesítő</option><option value="flat_monthly">Havi átalány</option><option value="manual">Egyedi</option></select></label>
+        <label>Elszámolás módja<select name="billingMode"><option value="per_job">Külön minden munkalap után</option><option value="monthly_grouped">Havi összesítés</option><option value="flat_monthly">Havi átalány</option><option value="manual">Egyedi</option></select></label>
         <label>Havi átalány (Ft)<input name="monthlyFlatFee" type="number" min="0" step="1"></label>
         <label class="wide">Helyszínek – soronként egy cím<textarea name="locations" rows="5"></textarea></label>
         <label class="wide">Irodai megjegyzés<textarea name="notes" rows="3"></textarea></label>
-        <label class="check-label"><input name="approved" type="checkbox"> Jóváhagyva, megjelenhet a dolgozóknak</label>
+        <label class="check-label"><input name="approved" type="checkbox"> Látható a dolgozók ügyféllistájában</label>
         <label class="check-label"><input name="active" type="checkbox" checked> Aktív ügyfél</label>
       </div>
       <p id="customerDialogStatus" class="office-status" role="status" aria-live="polite"></p>
@@ -211,9 +212,9 @@
   </dialog>
   <dialog id="successDialog"><h2>Köszönöm, hogy beküldted a Munkalapot 😊</h2><p>Nagyon Cuki vagy ❤️</p><button id="newWorksheet" type="button">Új munkalap</button></dialog>
 
-  <script src="supabase.js?v=23"></script>
-  <script src="supabase-config.js?v=23"></script>
-  <script src="munkalap-data.js?v=23"></script>
-  <script src="app.js?v=23"></script>
+  <script src="supabase.js?v=24"></script>
+  <script src="supabase-config.js?v=24"></script>
+  <script src="munkalap-data.js?v=24"></script>
+  <script src="app.js?v=24"></script>
 </body>
 </html>
