@@ -29,6 +29,8 @@
   let previewProfile = null;
   let previewWorksheets = [];
   let previewCustomers = [];
+  let previewPrices = [{code:'labor',label:'Munkadíj',unit:'Ft / fő / óra',unit_price:1,confirmed:false,updated_at:'preview'}];
+  const previewBilling = new Map();
 
   function readRememberedSessions() {
     try {
@@ -552,6 +554,56 @@
         .single();
       if (error) throw error;
       return data.id;
+    },
+
+    async billingPrices() {
+      if (previewMode) {
+        if (previewProfile?.role !== 'manager') throw new Error('Nincs jogosultság.');
+        return structuredClone(previewPrices);
+      }
+      const {data,error}=await client.from('billing_prices').select('*').order('code');
+      if(error) throw error;
+      return data;
+    },
+
+    async saveBillingPrice(price) {
+      if (previewMode) {
+        if (previewProfile?.role !== 'manager') throw new Error('Nincs jogosultság.');
+        previewPrices=previewPrices.map(row=>row.code===price.code?structuredClone(price):row);
+        return structuredClone(price);
+      }
+      const {data,error}=await client.from('billing_prices').update({unit_price:price.unit_price,confirmed:price.confirmed})
+        .eq('code',price.code).eq('updated_at',price.updated_at).select('*').maybeSingle();
+      if(error) throw error;
+      if(!data) throw new Error('Az árat közben más módosította, vagy nincs jogosultságod. Töltsd újra az árlistát.');
+      return data;
+    },
+
+    async billingDraft(id) {
+      if (previewMode) {
+        if (previewProfile?.role !== 'manager') throw new Error('Nincs jogosultság.');
+        return structuredClone(previewBilling.get(id)||null);
+      }
+      const {data,error}=await client.from('billing_drafts').select('*').eq('worksheet_id',id).maybeSingle();
+      if(error) throw error;
+      return data;
+    },
+
+    async saveBillingDraft(draft) {
+      if (previewMode) {
+        if (previewProfile?.role !== 'manager') throw new Error('Nincs jogosultság.');
+        const row={...structuredClone(draft),updated_at:new Date().toISOString()};
+        previewBilling.set(draft.worksheet_id,row);return row;
+      }
+      const payload={worksheet_id:draft.worksheet_id,source_snapshot:draft.source_snapshot,items:draft.items,notes:draft.notes,status:draft.status};
+      const query=draft.updated_at
+        ? client.from('billing_drafts').update(payload).eq('worksheet_id',draft.worksheet_id).eq('updated_at',draft.updated_at)
+        : client.from('billing_drafts').insert(payload);
+      const {data,error}=await query.select('*').maybeSingle();
+      if(error?.code==='23505') throw new Error('Ehhez a munkalaphoz közben már készült elszámolás. Nyisd meg újra.');
+      if(error) throw error;
+      if(!data) throw new Error('Az elszámolást közben más módosította, vagy nincs jogosultságod. Nyisd meg újra.');
+      return data;
     },
 
     async databaseSize() {

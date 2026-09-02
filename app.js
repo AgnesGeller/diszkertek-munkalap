@@ -1,7 +1,7 @@
 const EMAIL_ENDPOINT = "https://formsubmit.co/ajax/info@diszkertek.hu";
 const EMAIL_RECIPIENT = "info@diszkertek.hu";
 const STABLE_APP_URL = "https://agnesgeller.github.io/diszkertek-munkalap/";
-const APP_VERSION = "25";
+const APP_VERSION = "26";
 const QUEUE_KEY = "diszkertek-munkalap-send-queue-v1";
 const MANAGER_VIEW_KEY = "diszkertek-munkalap-manager-view-v1";
 const DATABASE_FREE_LIMIT = 500 * 1024 * 1024;
@@ -598,7 +598,7 @@ $("#fallbackNotSent").addEventListener("click", () => {
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState !== "visible") return;
   finishExternalEmail();
-  if (updateReloadPending && !formDirty) window.location.reload();
+  if (updateReloadPending && !formDirty && !window.Billing?.hasUnsaved()) window.location.reload();
   serviceWorkerRegistration?.update().catch(() => {});
 });
 
@@ -686,6 +686,7 @@ function worksheetCardHTML(item, office = false) {
       <div class="card-actions">
         ${item.pending ? (canManagePending ? `<button class="delete-button" type="button" data-cancel-queue="${escapeHTML(item.pendingQueueId)}">Várakozó példány törlése</button>` : "") : `<button type="button" data-edit="${escapeHTML(item.id)}">Megnyitás / Szerkesztés</button>`}
         ${office ? `<button type="button" data-print="${escapeHTML(item.id)}">PDF / Nyomtatás</button>` : ""}
+        ${office && !item.pending ? `<button class="budget-tab" type="button" data-budget="${escapeHTML(item.id)}">Elszámolás</button>` : ""}
         ${office && !item.pending ? `<button class="delete-button" type="button" data-delete="${escapeHTML(item.id)}">Törlés</button>` : ""}
       </div>
     </article>`;
@@ -1138,10 +1139,12 @@ function cancelQueuedWorksheet(queueId) {
   showStatus("A várakozó példányt töröltük. Más munkalaphoz nem nyúltunk.", "success");
 }
 
-$("#officeWorksheets").addEventListener("click", event => {
+$("#officeWorksheets").addEventListener("click", async event => {
   const edit = event.target.closest("[data-edit]");
   const print = event.target.closest("[data-print]");
   const remove = event.target.closest("[data-delete]");
+  const budget = event.target.closest("[data-budget]");
+  if (budget) { await setManagerView("budget"); if (managerView === "budget") await window.Billing?.open(budget.dataset.budget); }
   if (edit) openWorksheetForEdit(edit.dataset.edit);
   if (print) printWorksheet(print.dataset.print);
   if (remove) deleteWorksheet(remove.dataset.delete, remove);
@@ -1166,18 +1169,21 @@ async function deleteWorksheet(id, button) {
   } catch (error) {
     button.disabled = false;
     button.textContent = "Törlés";
-    showOfficeStatus(`A törlés nem sikerült: ${error?.message || "ismeretlen hiba"}.`, "error");
+    showOfficeStatus(error?.code === "23503" ? "Ehhez a munkalaphoz elszámolás vagy más kapcsolódó adat tartozik, ezért nem törölhető." : `A törlés nem sikerült: ${error?.message || "ismeretlen hiba"}.`, "error");
   }
 }
 
 function setManagerView(view) {
   if (session?.role !== "manager") return;
-  managerView = ["office", "customers", "worksheet"].includes(view) ? view : "worksheet";
+  if (managerView === "budget" && view !== "budget" && !window.Billing?.canLeave()) return;
+  managerView = ["office", "customers", "worksheet", "budget"].includes(view) ? view : "worksheet";
   officeViewActive = managerView === "office";
   localStorage.setItem(MANAGER_VIEW_KEY, managerView);
   $("#officeView").hidden = !officeViewActive;
   $("#customersView").hidden = managerView !== "customers";
   $("#worksheetView").hidden = managerView !== "worksheet";
+  $("#budgetView").hidden = managerView !== "budget";
+  $("#budgetTab").classList.toggle("active", managerView === "budget");
   $("#officeTab").classList.toggle("active", officeViewActive);
   $("#customersTab").classList.toggle("active", managerView === "customers");
   $("#worksheetTab").classList.toggle("active", managerView === "worksheet");
@@ -1191,10 +1197,12 @@ function setManagerView(view) {
     renderCustomers();
     if (!customersLoaded) loadCustomers(true, true);
   }
+  if (managerView === "budget") return window.Billing?.show();
 }
 
 $("#officeTab").addEventListener("click", () => setManagerView("office"));
 $("#customersTab").addEventListener("click", () => setManagerView("customers"));
+$("#budgetTab").addEventListener("click", () => setManagerView("budget"));
 $("#worksheetTab").addEventListener("click", () => setManagerView("worksheet"));
 $("#previousOfficeWeek").addEventListener("click", () => moveOfficeWeek(-7));
 $("#nextOfficeWeek").addEventListener("click", () => moveOfficeWeek(7));
@@ -1401,6 +1409,7 @@ $("#enterButton").addEventListener("click", login);
 $("#pinField").addEventListener("keydown", event => { if (event.key === "Enter") login(); });
 
 async function openApp(profile) {
+  window.Billing?.reset();
   session = profile;
   customerLetter = "";
   $("#customerAlphabet").innerHTML = "";
@@ -1451,10 +1460,12 @@ async function openApp(profile) {
 }
 
 async function logout() {
+  if (window.Billing && !window.Billing.canLeave()) return;
   if (formDirty && !confirm("A kijelentkezés törli a most beírt adatokat. Biztosan kijelentkezel?")) return;
   const previousSession = session;
   const canSwitchProfile = previousSession?.role === "manager" || Boolean(previousSession?.delegatedBy);
   await MunkalapDB.logout();
+  window.Billing?.reset();
   session = null;
   worksheets = [];
   officeLoaded = false;
@@ -1595,6 +1606,7 @@ $("#installButton").addEventListener("click", async () => {
 $("#installButton").textContent = isMobileDevice() ? "Telepítés telefonra" : "Telepítés számítógépre";
 
 $("#refreshButton").addEventListener("click", async () => {
+  if (window.Billing && !window.Billing.canLeave()) return;
   if (!navigator.onLine) { showInstallMessage("Nincs internetkapcsolat", "A frissítéshez internetkapcsolat szükséges."); return; }
   if (formDirty && !confirm("A frissítés törli a most beírt adatokat. Biztosan frissíted az alkalmazást?")) return;
   const button = $("#refreshButton");
@@ -1617,7 +1629,7 @@ if ("serviceWorker" in navigator) {
   let updateReloadStarted = false;
   navigator.serviceWorker.addEventListener("controllerchange", () => {
     if (updateReloadStarted) return;
-    if (formDirty) { updateReloadPending = true; return; }
+    if (formDirty || window.Billing?.hasUnsaved()) { updateReloadPending = true; return; }
     updateReloadStarted = true;
     const url = new URL(location.href);
     url.searchParams.set("app-version", APP_VERSION);
@@ -1650,4 +1662,5 @@ async function initialize() {
   }
 }
 
-initialize();
+if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", initialize, {once:true});
+else initialize();

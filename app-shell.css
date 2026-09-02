@@ -61,6 +61,24 @@ button{font-family:Arial,sans-serif}
 .office-filters button{align-self:end;min-height:42px}
 .office-filters label{min-width:0}
 .office-scope{font-weight:bold;color:var(--green);overflow-wrap:anywhere}
+.manager-tabs .budget-tab,.card-actions .budget-tab{border-color:#c32631;color:#ae1520}
+.manager-tabs .budget-tab.active{background:#c32631;color:white}
+.budget-view{margin:24px 0;padding:22px;border-top:6px solid #c32631;background:#fffafa}
+.budget-view h2,.budget-view h3{color:#ae1520}
+.budget-view label{display:grid;gap:6px;min-width:0;font:14px Arial,sans-serif}
+.budget-view input:not([type=checkbox]),.budget-view select,.budget-view textarea{width:100%;min-height:44px;border:1px solid #cda7aa;padding:9px;border-radius:5px;box-sizing:border-box;font:15px Arial,sans-serif}
+.budget-view button{min-height:44px;padding:10px 15px;background:#b51f2b;color:white;border:0;border-radius:5px;cursor:pointer}
+.budget-view button:disabled{opacity:.5;cursor:wait}
+.budget-toolbar{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:12px}
+.budget-view details{margin:22px 0}.budget-view summary{padding:12px 0;font-weight:bold;cursor:pointer}
+.budget-price{display:grid;grid-template-columns:minmax(0,1fr) 150px auto;align-items:end;gap:12px;padding:12px 0;border-bottom:1px solid #edd0d2}
+.budget-view .budget-check{display:flex;align-items:center;gap:8px;min-height:44px}.budget-check input{width:20px;height:20px}
+.budget-item{display:grid;grid-template-columns:1fr 1fr;gap:12px;border:1px solid #dfbdc0;margin:18px 0;padding:16px;min-width:0}
+.budget-item-name{grid-column:1/-1}.budget-item legend{color:#a31823;font-weight:bold}
+.budget-total{font-size:20px;text-align:right}.budget-flat{padding:12px;background:#fff0d1;color:#563c00;line-height:1.5}
+.budget-warning{color:#ac1725;font-weight:bold;line-height:1.5}
+#budgetForm>label{margin:14px 0}#budgetSave{width:100%;font-weight:bold}
+@media(max-width:600px){.budget-view{padding:14px 8px}.budget-toolbar,.budget-price{grid-template-columns:1fr}.budget-item{padding:10px}.budget-total{text-align:left;font-size:18px}}
 .office-actions{display:flex;flex-wrap:wrap;gap:10px;margin:18px 0}
 .office-status{min-height:20px;margin:8px 0;color:var(--muted);font:13px/1.4 Arial,sans-serif}
 .office-status.error{color:#8c2923}.office-status.success{color:#286b36}

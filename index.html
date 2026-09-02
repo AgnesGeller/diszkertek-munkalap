@@ -6,13 +6,13 @@
   <meta name="theme-color" content="#315f37">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Munkalap">
-  <link rel="manifest" href="manifest.webmanifest?v=25">
+  <link rel="manifest" href="manifest.webmanifest?v=26">
   <link rel="icon" href="munkalap-m-favicon-v12.ico" sizes="any">
   <link rel="icon" href="munkalap-m-icon-32-v12.png" type="image/png" sizes="32x32">
   <link rel="apple-touch-icon" href="munkalap-m-icon-apple-180-v12.png">
-  <link rel="stylesheet" href="styles.css?v=25">
-  <link rel="stylesheet" href="logo-overrides.css?v=25">
-  <link rel="stylesheet" href="app-shell.css?v=25">
+  <link rel="stylesheet" href="styles.css?v=26">
+  <link rel="stylesheet" href="logo-overrides.css?v=26">
+  <link rel="stylesheet" href="app-shell.css?v=26">
   <title>Díszkertek – Napi munkalap</title>
   <meta name="description" content="Díszkertek napi munkalapok és ügyfélnyilvántartás.">
   <meta property="og:title" content="Díszkertek – Napi munkalap">
@@ -64,6 +64,7 @@
     <nav id="managerTabs" class="manager-tabs" hidden aria-label="Irodai nézet vagy napi munkalap">
       <button id="officeTab" type="button">IRODA</button>
       <button id="customersTab" type="button">ÜGYFELEK</button>
+      <button id="budgetTab" class="budget-tab" type="button">KÖLTSÉGVETÉS</button>
       <button id="worksheetTab" type="button">NAPI MUNKALAP</button>
     </nav>
 
@@ -171,6 +172,30 @@
       <div id="officeWorksheets" class="worksheet-list office-list"></div>
     </section>
 
+    <section id="budgetView" class="budget-view" hidden>
+      <h2>Költségvetés</h2>
+      <p id="budgetStatus" role="status" aria-live="polite"></p>
+      <div class="budget-toolbar">
+        <label>Munkalap<select id="budgetSheet"><option value="">Válassz munkalapot</option></select></label>
+        <button id="budgetOpen" type="button">Elszámolás megnyitása</button>
+      </div>
+      <details id="budgetPrices"><summary>Árlista szerkesztése</summary>
+        <p>A nem egyeztetett egységárak ellenőrzésre várnak. Az ármódosítás a már mentett elszámolásokat nem írja át.</p>
+        <div id="budgetPriceList"></div>
+      </details>
+      <form id="budgetForm" hidden>
+        <h3 id="budgetHeading"></h3>
+        <p id="budgetSourceWarning" class="budget-warning" hidden></p>
+        <p id="budgetFlat" class="budget-flat" hidden></p>
+        <div id="budgetItems"></div>
+        <button id="budgetAdd" type="button">+ Egyéb tétel</button>
+        <p class="budget-total">Munkalap számított értéke: <strong id="budgetTotal"></strong></p>
+        <label>Megjegyzés<textarea id="budgetNotes" maxlength="5000" rows="3"></textarea></label>
+        <label>Állapot<select id="budgetState"><option value="draft">Piszkozat</option><option value="ready">Ellenőrizve</option></select></label>
+        <button id="budgetSave" type="submit">Elszámolás mentése</button>
+      </form>
+    </section>
+
     <footer class="company-footer">
       <img src="official-icon-192.png" alt="" aria-hidden="true">
       <div><b>Netteszt Kft</b><span>Adószám: 12437164-2-13</span><span>www.diszkertek.hu · 0670 634 9630</span><span>info@diszkertek.hu</span></div>
@@ -214,9 +239,11 @@
   </dialog>
   <dialog id="successDialog"><h2>Köszönöm, hogy beküldted a Munkalapot 😊</h2><p>Nagyon Cuki vagy ❤️</p><button id="newWorksheet" type="button">Új munkalap</button></dialog>
 
-  <script src="supabase.js?v=25"></script>
-  <script src="supabase-config.js?v=25"></script>
-  <script src="munkalap-data.js?v=25"></script>
-  <script src="app.js?v=25"></script>
+  <script src="supabase.js?v=26"></script>
+  <script src="supabase-config.js?v=26"></script>
+  <script src="munkalap-data.js?v=26"></script>
+  <script src="app.js?v=26"></script>
+  <script src="billing-math.js?v=26"></script>
+  <script src="billing.js?v=26"></script>
 </body>
 </html>
