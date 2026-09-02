@@ -38,6 +38,11 @@
       let quantity='1',numeric=true;try{quantity=decimal(value,3,1000000);}catch(_){numeric=false;}
       result.push({label:price.label+(numeric?'':': '+value),quantity,unit:price.unit,unitPrice:String(price.unit_price),divisor:1,reviewed:numeric&&price.confirmed});
     }
+    const earth=Number(String(data.construction_3||'').replace(',','.'));
+    const freight=prices.find(p=>p.code==='extra_earth_freight');
+    if(earth>0&&Number.isFinite(earth)&&freight){
+      result.push({label:freight.label,quantity:'1',unit:freight.unit,unitPrice:String(freight.unit_price),divisor:1,reviewed:false});
+    }
     for(const key of ['subcontractor','rental1','rental2','rental3']){
       if(data[key]) result.push({label:(key==='subcontractor'?'Alvállalkozó: ':'Gépbérlés: ')+data[key],quantity:'1',unit:'tétel',unitPrice:'0',divisor:1,reviewed:false});
     }
