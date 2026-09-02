@@ -1,7 +1,7 @@
 const EMAIL_ENDPOINT = "https://formsubmit.co/ajax/info@diszkertek.hu";
 const EMAIL_RECIPIENT = "info@diszkertek.hu";
 const STABLE_APP_URL = "https://agnesgeller.github.io/diszkertek-munkalap/";
-const APP_VERSION = "22";
+const APP_VERSION = "23";
 const QUEUE_KEY = "diszkertek-munkalap-send-queue-v1";
 const MANAGER_VIEW_KEY = "diszkertek-munkalap-manager-view-v1";
 const DATABASE_FREE_LIMIT = 500 * 1024 * 1024;
@@ -55,6 +55,12 @@ let officeLoaded = false;
 let officeLoading = false;
 let officeWeekStart = startOfOfficeWeek(new Date());
 let officeWeekActive = true;
+let managerView = "worksheet";
+let customerDirectory = [];
+let customersLoaded = false;
+let customersLoading = false;
+let selectedCustomerId = null;
+let selectedLocationId = null;
 
 function escapeHTML(value) {
   return String(value ?? "").replace(/[&<>'"]/g, character => ({
@@ -412,6 +418,8 @@ function resetForm(options = {}) {
   editingId = null;
   pendingCurrentQueueId = null;
   formDirty = false;
+  selectedCustomerId = null;
+  selectedLocationId = null;
   form.elements.teamLeader.value = session?.name || "";
   form.elements.date.value = formatHungarianDate(isoToday());
   form.querySelector(".submit-button").textContent = "Munkalap elküldése";
@@ -424,8 +432,15 @@ function resetForm(options = {}) {
   updateQueueNotice();
 }
 
+function customerNameKey(value) {
+  return String(value || "").trim().replace(/\s+/g, " ").toLocaleLowerCase("hu-HU").replace(/ zoli$/, " zoltán");
+}
+
 function worksheetFromForm(existing) {
   const data = formDataObject();
+  const customer = customerDirectory.find(item => customerNameKey(item.fullName) === customerNameKey(data.customerName));
+  data.customerName = customer?.fullName || String(data.customerName || "").trim().replace(/\s+/g, " ").replace(/ zoli$/i, " Zoltán");
+  const location = customer?.locations?.find(item => item.address.trim().toLocaleLowerCase("hu-HU") === String(data.address || "").trim().toLocaleLowerCase("hu-HU"));
   const date = toDateInputValue(data.date);
   if (!date) throw new Error("Válassz érvényes dátumot.");
   const leader = existing?.leader || session.name;
@@ -437,6 +452,8 @@ function worksheetFromForm(existing) {
     leader,
     customer: String(data.customerName || "").trim(),
     address: String(data.address || "").trim(),
+    customerId: customer?.id || selectedCustomerId,
+    locationId: location?.id || selectedLocationId,
     date,
     data
   };
@@ -472,6 +489,20 @@ form.addEventListener("submit", async event => {
     let saved = null;
     let databaseError = null;
     let emailError = null;
+
+    if ((!record.customerId || !record.locationId) && navigator.onLine) {
+      try {
+        const linked = await withTimeout(
+          MunkalapDB.registerCustomerSuggestion(record.customer, record.address),
+          5000,
+          "Az ügyféllista most nem érhető el."
+        );
+        record.customerId = linked.customerId;
+        record.locationId = linked.locationId;
+      } catch (_) {
+        // Az ügyféllista hibája nem akadályozhatja a munkalap beküldését.
+      }
+    }
 
     if (navigator.onLine) {
       const databaseTask = existing
@@ -714,21 +745,220 @@ function showOfficeStatus(message = "", type = "") {
   target.className = `office-status${type ? ` ${type}` : ""}`;
 }
 
+function hideCustomerSuggestions(target) {
+  target.hidden = true;
+  target.innerHTML = "";
+  const input = target.parentElement?.querySelector("input");
+  if (input) input.setAttribute("aria-expanded", "false");
+}
+
+function showCustomerSuggestions(target, matches) {
+  if (!matches.length) {
+    hideCustomerSuggestions(target);
+    return;
+  }
+  target.innerHTML = matches.map(match => `
+    <button type="button" data-customer-id="${escapeHTML(match.customerId)}" data-location-id="${escapeHTML(match.locationId || "")}" data-customer-name="${escapeHTML(match.name)}" data-address="${escapeHTML(match.address || "")}">
+      <b>${escapeHTML(match.name)}</b>${match.address ? `<span>${escapeHTML(match.address)}</span>` : ""}
+    </button>`).join("");
+  target.hidden = false;
+  const input = target.parentElement?.querySelector("input");
+  if (input) input.setAttribute("aria-expanded", "true");
+}
+
+function customerMatches(query, addressOnly = false) {
+  const needle = customerNameKey(query);
+  if (needle.length < 2) return [];
+  const selected = selectedCustomerId
+    ? customerDirectory.filter(customer => customer.id === selectedCustomerId)
+    : customerDirectory;
+  const matches = [];
+  for (const customer of selected) {
+    if (!customer.active) continue;
+    const activeLocations = (customer.locations || []).filter(location => location.active !== false);
+    const locations = activeLocations.length ? activeLocations : [{ id: "", address: "" }];
+    for (const location of locations) {
+      const nameMatch = customerNameKey(customer.fullName).includes(needle);
+      const addressMatch = String(location.address || "").toLocaleLowerCase("hu-HU").includes(needle);
+      if ((addressOnly && addressMatch) || (!addressOnly && (nameMatch || addressMatch))) {
+        matches.push({ customerId: customer.id, locationId: location.id, name: customer.fullName, address: location.address });
+      }
+    }
+  }
+  return matches.slice(0, 12);
+}
+
 function updateSuggestions() {
-  const customers = [...new Set(worksheets.map(item => item.customer).filter(Boolean))].sort((a, b) => a.localeCompare(b, "hu"));
-  const addresses = [...new Set(worksheets.map(item => item.address).filter(Boolean))].sort((a, b) => a.localeCompare(b, "hu"));
   const customerInput = form.elements.customerName;
   const addressInput = form.elements.address;
-  const render = (target, values, query) => {
-    const needle = String(query || "").trim().toLocaleLowerCase("hu-HU");
-    target.innerHTML = needle.length < 2 ? "" : values
-      .filter(value => value.toLocaleLowerCase("hu-HU").includes(needle))
-      .slice(0, 12)
-      .map(value => `<option value="${escapeHTML(value)}"></option>`).join("");
+  customerInput.oninput = () => {
+    selectedCustomerId = null;
+    selectedLocationId = null;
+    showCustomerSuggestions($("#customerSuggestions"), customerMatches(customerInput.value));
   };
-  customerInput.oninput = () => render($("#customerSuggestions"), customers, customerInput.value);
-  addressInput.oninput = () => render($("#addressSuggestions"), addresses, addressInput.value);
+  customerInput.onfocus = () => showCustomerSuggestions($("#customerSuggestions"), customerMatches(customerInput.value));
+  addressInput.oninput = () => {
+    selectedLocationId = null;
+    showCustomerSuggestions($("#addressSuggestions"), customerMatches(addressInput.value, true));
+  };
+  addressInput.onfocus = () => showCustomerSuggestions($("#addressSuggestions"), customerMatches(addressInput.value, true));
 }
+
+function chooseCustomerSuggestion(button) {
+  selectedCustomerId = button.dataset.customerId || null;
+  selectedLocationId = button.dataset.locationId || null;
+  form.elements.customerName.value = button.dataset.customerName || "";
+  form.elements.address.value = button.dataset.address || "";
+  hideCustomerSuggestions($("#customerSuggestions"));
+  hideCustomerSuggestions($("#addressSuggestions"));
+  formDirty = true;
+}
+
+$("#customerSuggestions").addEventListener("click", event => {
+  const button = event.target.closest("button[data-customer-id]");
+  if (button) chooseCustomerSuggestion(button);
+});
+$("#addressSuggestions").addEventListener("click", event => {
+  const button = event.target.closest("button[data-customer-id]");
+  if (button) chooseCustomerSuggestion(button);
+});
+document.addEventListener("click", event => {
+  if (!event.target.closest(".customer-field")) {
+    hideCustomerSuggestions($("#customerSuggestions"));
+    hideCustomerSuggestions($("#addressSuggestions"));
+  }
+});
+
+async function loadCustomers(manager = session?.role === "manager", showErrors = false) {
+  if (!session || customersLoading) return;
+  const loadingSession = session;
+  customersLoading = true;
+  if (manager) $("#customersStatus").textContent = "Ügyféllista betöltése…";
+  try {
+    const loadedCustomers = await MunkalapDB.listCustomers(Boolean(manager));
+    if (session !== loadingSession) return;
+    customerDirectory = loadedCustomers;
+    customersLoaded = true;
+    renderCustomers();
+    updateSuggestions();
+    if (manager) $("#customersStatus").textContent = "";
+  } catch (error) {
+    if (session !== loadingSession) return;
+    customersLoaded = false;
+    if (manager && showErrors) $("#customersStatus").textContent = `Az ügyféllista nem tölthető be: ${error?.message || "ismeretlen hiba"}.`;
+  } finally {
+    if (session === loadingSession) customersLoading = false;
+  }
+}
+
+function billingModeLabel(mode) {
+  return ({ flat_monthly: "Havi átalány", monthly_grouped: "Havi összesítő", per_job: "Munkánként", manual: "Egyedi" })[mode] || "Munkánként";
+}
+
+function renderCustomers() {
+  if (session?.role !== "manager") return;
+  const needle = String($("#customerSearch").value || "").trim().toLocaleLowerCase("hu-HU");
+  const filtered = customerDirectory.filter(customer => {
+    const searchable = [customer.fullName, customer.email, customer.phone, customer.contactName, ...(customer.locations || []).map(location => location.address)].join(" ").toLocaleLowerCase("hu-HU");
+    return !needle || searchable.includes(needle);
+  });
+  $("#customersCount").textContent = `${filtered.length} ügyfél`;
+  $("#customersList").innerHTML = filtered.length ? filtered.map(customer => `
+    <article class="customer-card">
+      <header><div><h3>${escapeHTML(customer.fullName)}</h3><div class="customer-meta">
+        <span class="customer-badge ${customer.reviewStatus === "pending" ? "pending" : ""}">${customer.reviewStatus === "approved" ? "Jóváhagyott" : "Ellenőrzésre vár"}</span>
+        ${customer.active ? "" : `<span class="customer-badge inactive">Inaktív</span>`}
+        <span class="customer-badge">${escapeHTML(billingModeLabel(customer.billingMode))}</span>
+      </div></div><button type="button" data-customer-edit="${escapeHTML(customer.id)}">Szerkesztés</button></header>
+      ${(customer.locations || []).some(location => location.active !== false) ? `<p><b>Helyszínek:</b> ${(customer.locations || []).filter(location => location.active !== false).map(location => escapeHTML(location.address)).join(" · ")}</p>` : `<p><b>Helyszín:</b> még nincs megadva</p>`}
+      ${customer.email || customer.phone ? `<p><b>Kapcsolat:</b> ${escapeHTML([customer.email, customer.phone].filter(Boolean).join(" · "))}</p>` : ""}
+      <div class="card-actions"><button class="delete-button" type="button" data-customer-delete="${escapeHTML(customer.id)}">Törlés</button></div>
+    </article>`).join("") : `<p class="empty-list">Nincs a keresésnek megfelelő ügyfél.</p>`;
+}
+
+function openCustomerDialog(customer = null) {
+  const customerForm = $("#customerForm");
+  customerForm.reset();
+  customerForm.elements.id.value = customer?.id || "";
+  customerForm.elements.fullName.value = customer?.fullName || "";
+  customerForm.elements.customerType.value = customer?.customerType || "";
+  customerForm.elements.contactName.value = customer?.contactName || "";
+  customerForm.elements.email.value = customer?.email || "";
+  customerForm.elements.phone.value = customer?.phone || "";
+  customerForm.elements.taxNumber.value = customer?.taxNumber || "";
+  customerForm.elements.billingMode.value = customer?.billingMode || "per_job";
+  customerForm.elements.monthlyFlatFee.value = customer?.monthlyFlatFee ?? "";
+  customerForm.elements.locations.value = (customer?.locations || []).filter(location => location.active !== false).map(location => location.address).join("\n");
+  customerForm.elements.notes.value = customer?.notes || "";
+  customerForm.elements.approved.checked = customer?.reviewStatus === "approved";
+  customerForm.elements.active.checked = customer?.active !== false;
+  $("#customerDialogTitle").textContent = customer ? "Ügyfél szerkesztése" : "Új ügyfél";
+  $("#customerDialogStatus").textContent = "";
+  $("#customerDialog").showModal();
+}
+
+$("#customerSearch").addEventListener("input", renderCustomers);
+$("#newCustomer").addEventListener("click", () => openCustomerDialog());
+$("#customerCancel").addEventListener("click", () => $("#customerDialog").close());
+$("#customersList").addEventListener("click", async event => {
+  const edit = event.target.closest("[data-customer-edit]");
+  const remove = event.target.closest("[data-customer-delete]");
+  if (edit) openCustomerDialog(customerDirectory.find(customer => customer.id === edit.dataset.customerEdit));
+  if (remove) {
+    const customer = customerDirectory.find(item => item.id === remove.dataset.customerDelete);
+    if (!customer || !confirm(`Biztosan törlöd ezt az ügyfelet?\n\n${customer.fullName}\n\nHa munkalap kapcsolódik hozzá, a rendszer biztonságból nem engedi törölni; ilyenkor tedd inaktívvá.`)) return;
+    try {
+      await MunkalapDB.removeCustomer(customer.id);
+      customerDirectory = customerDirectory.filter(item => item.id !== customer.id);
+      renderCustomers();
+      $("#customersStatus").textContent = "Az ügyfelet töröltük.";
+    } catch (_) {
+      $("#customersStatus").textContent = "Ehhez az ügyfélhez már tartozik munkalap vagy helyszín. Törlés helyett kapcsold ki az Aktív ügyfél jelölést.";
+    }
+  }
+});
+
+$("#customerForm").addEventListener("submit", async event => {
+  event.preventDefault();
+  const customerForm = event.currentTarget;
+  if (!customerForm.reportValidity()) return;
+  const existing = customerDirectory.find(customer => customer.id === customerForm.elements.id.value);
+  const addresses = String(customerForm.elements.locations.value || "").split(/\r?\n/).map(value => value.trim()).filter(Boolean);
+  const locations = addresses.map(address => {
+    const saved = existing?.locations?.find(location => location.address.toLocaleLowerCase("hu-HU") === address.toLocaleLowerCase("hu-HU"));
+    return { id: saved?.id, address, label: saved?.label || "", active: true, reviewStatus: customerForm.elements.approved.checked ? "approved" : "pending" };
+  });
+  const payload = {
+    id: existing?.id,
+    fullName: customerForm.elements.fullName.value.trim(),
+    customerType: customerForm.elements.customerType.value.trim(),
+    contactName: customerForm.elements.contactName.value.trim(),
+    email: customerForm.elements.email.value.trim(),
+    phone: customerForm.elements.phone.value.trim(),
+    taxNumber: customerForm.elements.taxNumber.value.trim(),
+    billingMode: customerForm.elements.billingMode.value,
+    monthlyFlatFee: customerForm.elements.monthlyFlatFee.value,
+    notes: customerForm.elements.notes.value.trim(),
+    reviewStatus: customerForm.elements.approved.checked ? "approved" : "pending",
+    active: customerForm.elements.active.checked,
+    locations,
+    removedLocationIds: (existing?.locations || []).filter(location => !locations.some(saved => saved.id === location.id)).map(location => location.id)
+  };
+  const saveButton = $("#customerSave");
+  saveButton.disabled = true;
+  $("#customerDialogStatus").textContent = "Mentés…";
+  try {
+    await MunkalapDB.saveCustomer(payload);
+    $("#customerDialog").close();
+    customersLoaded = false;
+    await loadCustomers(true, true);
+    $("#customersStatus").textContent = "Az ügyfél adatait elmentettük.";
+  } catch (error) {
+    $("#customerDialogStatus").textContent = `A mentés nem sikerült: ${error?.message || "ismeretlen hiba"}.`;
+  } finally {
+    saveButton.disabled = false;
+  }
+});
 
 function renderAll() {
   renderRecent();
@@ -801,6 +1031,8 @@ function fillFormFromWorksheet(item) {
   form.elements.date.value = formatHungarianDate(item.date);
   form.elements.customerName.value = item.customer;
   form.elements.address.value = item.address;
+  selectedCustomerId = item.customerId || null;
+  selectedLocationId = item.locationId || null;
   form.querySelector(".submit-button").textContent = "Módosítás mentése";
   $("#cancelEdit").hidden = false;
   setManagerView("worksheet");
@@ -867,21 +1099,29 @@ async function deleteWorksheet(id, button) {
 
 function setManagerView(view) {
   if (session?.role !== "manager") return;
-  officeViewActive = view === "office";
-  localStorage.setItem(MANAGER_VIEW_KEY, view);
+  managerView = ["office", "customers", "worksheet"].includes(view) ? view : "worksheet";
+  officeViewActive = managerView === "office";
+  localStorage.setItem(MANAGER_VIEW_KEY, managerView);
   $("#officeView").hidden = !officeViewActive;
-  $("#worksheetView").hidden = officeViewActive;
+  $("#customersView").hidden = managerView !== "customers";
+  $("#worksheetView").hidden = managerView !== "worksheet";
   $("#officeTab").classList.toggle("active", officeViewActive);
-  $("#worksheetTab").classList.toggle("active", !officeViewActive);
+  $("#customersTab").classList.toggle("active", managerView === "customers");
+  $("#worksheetTab").classList.toggle("active", managerView === "worksheet");
   if (officeViewActive) {
     if (officeWeekActive) applyOfficeWeek();
     renderOffice();
     loadDatabaseUsage();
     if (!officeLoaded) loadOfficeWorksheets();
   }
+  if (managerView === "customers") {
+    renderCustomers();
+    if (!customersLoaded) loadCustomers(true, true);
+  }
 }
 
 $("#officeTab").addEventListener("click", () => setManagerView("office"));
+$("#customersTab").addEventListener("click", () => setManagerView("customers"));
 $("#worksheetTab").addEventListener("click", () => setManagerView("worksheet"));
 $("#previousOfficeWeek").addEventListener("click", () => moveOfficeWeek(-7));
 $("#nextOfficeWeek").addEventListener("click", () => moveOfficeWeek(7));
@@ -1087,8 +1327,16 @@ $("#pinField").addEventListener("keydown", event => { if (event.key === "Enter")
 
 async function openApp(profile) {
   session = profile;
+  $("#customerDialog").close();
+  $("#customerForm").reset();
+  $("#customersList").innerHTML = "";
+  $("#customersCount").textContent = "";
+  $("#customersStatus").textContent = "";
   officeLoaded = false;
   officeLoading = false;
+  customersLoaded = false;
+  customersLoading = false;
+  customerDirectory = [];
   $("#loginView").hidden = true;
   $("#appView").hidden = false;
   $("#activeUser").textContent = "";
@@ -1104,11 +1352,13 @@ async function openApp(profile) {
     : "worksheet";
   if (profile.role !== "manager") {
     $("#officeView").hidden = true;
+    $("#customersView").hidden = true;
     $("#worksheetView").hidden = false;
   }
   const now = new Date();
   $("#archiveReminder").hidden = !(now.getMonth() === 11 && now.getDate() >= 10);
   await loadWorksheets();
+  await loadCustomers(profile.role === "manager", false);
   if (profile.role === "manager") setManagerView(initialManagerView);
   updateQueueNotice();
   syncQueue();
@@ -1131,6 +1381,9 @@ async function logout() {
   worksheets = [];
   officeLoaded = false;
   officeLoading = false;
+  customersLoaded = false;
+  customersLoading = false;
+  customerDirectory = [];
   $("#appView").hidden = true;
   $("#loginView").hidden = false;
   selectedProfile = canSwitchProfile ? "" : previousSession?.name || "";

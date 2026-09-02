@@ -6,14 +6,24 @@
   <meta name="theme-color" content="#315f37">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Munkalap">
-  <link rel="manifest" href="manifest.webmanifest?v=22">
+  <link rel="manifest" href="manifest.webmanifest?v=23">
   <link rel="icon" href="munkalap-m-favicon-v12.ico" sizes="any">
   <link rel="icon" href="munkalap-m-icon-32-v12.png" type="image/png" sizes="32x32">
   <link rel="apple-touch-icon" href="munkalap-m-icon-apple-180-v12.png">
-  <link rel="stylesheet" href="styles.css?v=22">
-  <link rel="stylesheet" href="logo-overrides.css?v=22">
-  <link rel="stylesheet" href="app-shell.css?v=22">
+  <link rel="stylesheet" href="styles.css?v=23">
+  <link rel="stylesheet" href="logo-overrides.css?v=23">
+  <link rel="stylesheet" href="app-shell.css?v=23">
   <title>Díszkertek – Napi munkalap</title>
+  <meta name="description" content="Díszkertek napi munkalapok és ügyfélnyilvántartás.">
+  <meta property="og:title" content="Díszkertek – Napi munkalap">
+  <meta property="og:description" content="Díszkertek napi munkalapok és ügyfélnyilvántartás.">
+  <meta property="og:url" content="https://agnesgeller.github.io/diszkertek-munkalap/">
+  <meta property="og:image" content="https://agnesgeller.github.io/diszkertek-munkalap/munkalap-m-icon-512-v12.png">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Díszkertek – Napi munkalap">
+  <meta name="twitter:description" content="Díszkertek napi munkalapok és ügyfélnyilvántartás.">
+  <meta name="twitter:image" content="https://agnesgeller.github.io/diszkertek-munkalap/munkalap-m-icon-512-v12.png">
 </head>
 <body>
   <main id="loginView" class="login-view">
@@ -51,8 +61,9 @@
       </div>
     </header>
 
-    <nav id="managerTabs" class="manager-tabs" hidden aria-label="Iroda vagy napi munkalap">
+    <nav id="managerTabs" class="manager-tabs" hidden aria-label="Irodai nézet vagy napi munkalap">
       <button id="officeTab" type="button">IRODA</button>
+      <button id="customersTab" type="button">ÜGYFELEK</button>
       <button id="worksheetTab" type="button">NAPI MUNKALAP</button>
     </nav>
 
@@ -62,10 +73,8 @@
         <section class="identity">
           <label class="leader"><b>Csoport vezető:</b><input name="teamLeader" readonly required></label>
           <label class="date"><b>Dátum:</b><span class="date-control"><input name="date" type="text" inputmode="numeric" placeholder="2026. 08. 15." aria-label="Dátum magyar formátumban" required><button id="datePickerButton" type="button">📅 Választás</button></span></label>
-          <label class="wide"><b>Ügyfél neve:</b><input name="customerName" list="customerSuggestions" autocomplete="off" required></label>
-          <label class="wide"><b>Cím:</b><input name="address" list="addressSuggestions" autocomplete="off" required></label>
-          <datalist id="customerSuggestions"></datalist>
-          <datalist id="addressSuggestions"></datalist>
+          <label class="wide customer-field"><b>Ügyfél neve:</b><input name="customerName" autocomplete="off" required aria-controls="customerSuggestions" aria-expanded="false"><span id="customerSuggestions" class="customer-suggestions" hidden></span></label>
+          <label class="wide customer-field"><b>Cím:</b><input name="address" autocomplete="off" required aria-controls="addressSuggestions" aria-expanded="false"><span id="addressSuggestions" class="customer-suggestions" hidden></span></label>
         </section>
 
         <section class="worktime">
@@ -109,6 +118,17 @@
         </div>
         <div id="recentWorksheets" class="worksheet-list"></div>
       </section>
+    </section>
+
+    <section id="customersView" class="customers-view" hidden>
+      <div class="section-heading customer-heading">
+        <div><h2>Ügyfélnyilvántartás</h2><p>A dolgozók csak a jóváhagyott teljes nevet és címet látják.</p></div>
+        <button id="newCustomer" class="primary-button" type="button">Új ügyfél</button>
+      </div>
+      <label class="customer-search"><span>Ügyfél keresése</span><input id="customerSearch" type="search" autocomplete="off" placeholder="Név, cím, e-mail vagy telefonszám"></label>
+      <p id="customersStatus" class="office-status" role="status" aria-live="polite"></p>
+      <p id="customersCount" class="office-count"></p>
+      <div id="customersList" class="customer-list"></div>
     </section>
 
     <section id="officeView" class="office-view" hidden>
@@ -167,11 +187,33 @@
       <button id="fallbackSent" type="button">Elküldtem</button>
     </div>
   </dialog>
+  <dialog id="customerDialog" class="customer-dialog">
+    <form id="customerForm" method="dialog">
+      <h2 id="customerDialogTitle">Ügyfél</h2>
+      <input name="id" type="hidden">
+      <div class="customer-form-grid">
+        <label class="wide">Teljes név<input name="fullName" required></label>
+        <label>Típus<input name="customerType" placeholder="Magánszemély vagy cég"></label>
+        <label>Kapcsolattartó<input name="contactName"></label>
+        <label>E-mail<input name="email" type="email"></label>
+        <label>Telefonszám<input name="phone" type="tel"></label>
+        <label>Adószám<input name="taxNumber"></label>
+        <label>Elszámolás<select name="billingMode"><option value="per_job">Munkánként</option><option value="monthly_grouped">Havi összesítő</option><option value="flat_monthly">Havi átalány</option><option value="manual">Egyedi</option></select></label>
+        <label>Havi átalány (Ft)<input name="monthlyFlatFee" type="number" min="0" step="1"></label>
+        <label class="wide">Helyszínek – soronként egy cím<textarea name="locations" rows="5"></textarea></label>
+        <label class="wide">Irodai megjegyzés<textarea name="notes" rows="3"></textarea></label>
+        <label class="check-label"><input name="approved" type="checkbox"> Jóváhagyva, megjelenhet a dolgozóknak</label>
+        <label class="check-label"><input name="active" type="checkbox" checked> Aktív ügyfél</label>
+      </div>
+      <p id="customerDialogStatus" class="office-status" role="status" aria-live="polite"></p>
+      <div class="dialog-actions"><button id="customerCancel" class="secondary" type="button">Mégse</button><button id="customerSave" type="submit">Mentés</button></div>
+    </form>
+  </dialog>
   <dialog id="successDialog"><h2>Köszönöm, hogy beküldted a Munkalapot 😊</h2><p>Nagyon Cuki vagy ❤️</p><button id="newWorksheet" type="button">Új munkalap</button></dialog>
 
-  <script src="supabase.js?v=22"></script>
-  <script src="supabase-config.js?v=22"></script>
-  <script src="munkalap-data.js?v=22"></script>
-  <script src="app.js?v=22"></script>
+  <script src="supabase.js?v=23"></script>
+  <script src="supabase-config.js?v=23"></script>
+  <script src="munkalap-data.js?v=23"></script>
+  <script src="app.js?v=23"></script>
 </body>
 </html>

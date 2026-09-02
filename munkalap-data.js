@@ -28,6 +28,7 @@
   let channel = null;
   let previewProfile = null;
   let previewWorksheets = [];
+  let previewCustomers = [];
 
   function readRememberedSessions() {
     try {
@@ -159,6 +160,8 @@
       leader: row.leader_name,
       customer: row.customer_name,
       address: row.address,
+      customerId: row.customer_id || null,
+      locationId: row.location_id || null,
       date: row.work_date,
       data: row.form_data || {},
       createdAt: row.created_at,
@@ -173,6 +176,8 @@
       leader_name: item.leader,
       customer_name: item.customer,
       address: item.address,
+      customer_id: item.customerId || null,
+      location_id: item.locationId || null,
       work_date: item.date,
       form_data: item.data || {}
     };
@@ -393,6 +398,8 @@
       const row = {
         customer_name: item.customer,
         address: item.address,
+        customer_id: item.customerId || null,
+        location_id: item.locationId || null,
         work_date: item.date,
         form_data: item.data || {}
       };
@@ -404,6 +411,129 @@
         .single();
       if (error) throw error;
       return mapWorksheet(data);
+    },
+
+    async listCustomers(manager = false) {
+      if (previewMode) {
+        return previewCustomers
+          .filter(item => manager || (item.active && item.reviewStatus === "approved"))
+          .map(item => ({ ...item, locations: item.locations.map(location => ({ ...location })) }));
+      }
+      const { data: customerRows, error: customerError } = await client
+        .from("customers")
+        .select("id,full_name,active,review_status,created_at,updated_at")
+        .order("full_name", { ascending: true });
+      if (customerError) throw customerError;
+      const ids = customerRows.map(row => row.id);
+      let locationRows = [];
+      let detailRows = [];
+      if (ids.length) {
+        const locationsResult = await client
+          .from("customer_locations")
+          .select("id,customer_id,label,address,active,review_status")
+          .in("customer_id", ids)
+          .order("address", { ascending: true });
+        if (locationsResult.error) throw locationsResult.error;
+        locationRows = locationsResult.data || [];
+        if (manager) {
+          const detailsResult = await client
+            .from("customer_details")
+            .select("customer_id,customer_type,contact_name,email,phone,tax_number,billing_mode,monthly_flat_fee,notes")
+            .in("customer_id", ids);
+          if (detailsResult.error) throw detailsResult.error;
+          detailRows = detailsResult.data || [];
+        }
+      }
+      const detailsByCustomer = new Map(detailRows.map(row => [row.customer_id, row]));
+      return customerRows.map(row => {
+        const detail = detailsByCustomer.get(row.id) || {};
+        return {
+          id: row.id,
+          fullName: row.full_name,
+          active: row.active,
+          reviewStatus: row.review_status,
+          createdAt: row.created_at,
+          updatedAt: row.updated_at,
+          customerType: detail.customer_type || "",
+          contactName: detail.contact_name || "",
+          email: detail.email || "",
+          phone: detail.phone || "",
+          taxNumber: detail.tax_number || "",
+          billingMode: detail.billing_mode || "per_job",
+          monthlyFlatFee: detail.monthly_flat_fee == null ? null : Number(detail.monthly_flat_fee),
+          notes: detail.notes || "",
+          locations: locationRows.filter(location => location.customer_id === row.id).map(location => ({
+            id: location.id,
+            label: location.label || "",
+            address: location.address,
+            active: location.active,
+            reviewStatus: location.review_status
+          }))
+        };
+      });
+    },
+
+    async saveCustomer(customer) {
+      if (previewMode) {
+        const saved = {
+          ...customer,
+          id: customer.id || `bemutato-ugyfel-${Date.now()}`,
+          locations: (customer.locations || []).map((location, index) => ({
+            ...location,
+            id: location.id || `bemutato-hely-${Date.now()}-${index}`
+          }))
+        };
+        const index = previewCustomers.findIndex(item => item.id === saved.id);
+        if (index >= 0) previewCustomers[index] = saved;
+        else previewCustomers.push(saved);
+        return saved;
+      }
+      const { data, error } = await client.rpc("save_customer", {
+        saved_customer_id: customer.id || null,
+        saved_full_name: customer.fullName.trim(),
+        saved_active: customer.active !== false,
+        saved_review_status: customer.reviewStatus || "approved",
+        saved_customer_type: customer.customerType || "",
+        saved_contact_name: customer.contactName || "",
+        saved_email: customer.email || "",
+        saved_phone: customer.phone || "",
+        saved_tax_number: customer.taxNumber || "",
+        saved_billing_mode: customer.billingMode || "per_job",
+        saved_monthly_flat_fee: customer.monthlyFlatFee == null || customer.monthlyFlatFee === "" ? null : Number(customer.monthlyFlatFee),
+        saved_notes: customer.notes || "",
+        saved_locations: customer.locations || [],
+        removed_location_ids: customer.removedLocationIds || []
+      });
+      if (error) throw error;
+      return data;
+    },
+
+    async registerCustomerSuggestion(name, address) {
+      if (previewMode) return { customerId: null, locationId: null };
+      const { data, error } = await client.rpc("register_customer_suggestion", {
+        proposed_name: name,
+        proposed_address: address
+      });
+      if (error) throw error;
+      const row = Array.isArray(data) ? data[0] : data;
+      return { customerId: row?.customer_id || null, locationId: row?.location_id || null };
+    },
+
+    async removeCustomer(id) {
+      if (previewMode) {
+        const index = previewCustomers.findIndex(customer => customer.id === id);
+        if (index < 0) throw new Error("Az ügyfél nem található.");
+        previewCustomers.splice(index, 1);
+        return id;
+      }
+      const { data, error } = await client
+        .from("customers")
+        .delete()
+        .eq("id", id)
+        .select("id")
+        .single();
+      if (error) throw error;
+      return data.id;
     },
 
     async remove(id) {
