@@ -602,6 +602,16 @@
       return data;
     },
 
+    async billingDrafts() {
+      if (previewMode) {
+        if (previewProfile?.role !== 'manager') throw new Error('Nincs jogosultság.');
+        return structuredClone(Array.from(previewBilling.values()));
+      }
+      const {data,error}=await client.from('billing_drafts').select('*').order('updated_at',{ascending:false});
+      if(error) throw error;
+      return data;
+    },
+
     async saveBillingDraft(draft) {
       if (previewMode) {
         if (previewProfile?.role !== 'manager') throw new Error('Nincs jogosultság.');

@@ -1,7 +1,7 @@
 const EMAIL_ENDPOINT = "https://formsubmit.co/ajax/info@diszkertek.hu";
 const EMAIL_RECIPIENT = "info@diszkertek.hu";
 const STABLE_APP_URL = "https://agnesgeller.github.io/diszkertek-munkalap/";
-const APP_VERSION = "29";
+const APP_VERSION = "30";
 const QUEUE_KEY = "diszkertek-munkalap-send-queue-v1";
 const MANAGER_VIEW_KEY = "diszkertek-munkalap-manager-view-v1";
 const DATABASE_FREE_LIMIT = 500 * 1024 * 1024;
@@ -434,15 +434,19 @@ function resetForm(options = {}) {
   updateQueueNotice();
 }
 
+function searchKey(value) {
+  return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().replace(/\s+/g, " ").toLocaleLowerCase("hu-HU");
+}
+
 function customerNameKey(value) {
-  return String(value || "").trim().replace(/\s+/g, " ").toLocaleLowerCase("hu-HU").replace(/ zoli$/, " zoltán");
+  return searchKey(value).replace(/ zoli$/, " zoltan");
 }
 
 function worksheetFromForm(existing) {
   const data = formDataObject();
   const customer = customerDirectory.find(item => customerNameKey(item.fullName) === customerNameKey(data.customerName));
   data.customerName = customer?.fullName || String(data.customerName || "").trim().replace(/\s+/g, " ").replace(/ zoli$/i, " Zoltán");
-  const location = customer?.locations?.find(item => item.address.trim().toLocaleLowerCase("hu-HU") === String(data.address || "").trim().toLocaleLowerCase("hu-HU"));
+  const location = customer?.locations?.find(item => searchKey(item.address) === searchKey(data.address));
   const date = toDateInputValue(data.date);
   if (!date) throw new Error("Válassz érvényes dátumot.");
   const leader = existing?.leader || session.name;
@@ -721,7 +725,7 @@ function renderRecent() {
 }
 
 function officeAddressKey(value) {
-  return String(value || "").trim().toLocaleLowerCase("hu-HU").replace(/[.,]/g, "").replace(/\s+/g, " ");
+  return searchKey(value).replace(/[.,]/g, "");
 }
 
 function officeLocationKey(item) {
@@ -766,16 +770,16 @@ function renderOfficeLocations() {
 
 function filteredOfficeWorksheets() {
   const leader = $("#filterLeader").value;
-  const customer = $("#filterCustomer").value.trim().toLocaleLowerCase("hu-HU");
-  const address = $("#filterAddress").value.trim().toLocaleLowerCase("hu-HU");
+  const customer = searchKey($("#filterCustomer").value);
+  const address = searchKey($("#filterAddress").value);
   const from = $("#filterFrom").value;
   const to = $("#filterTo").value;
   const location = $("#filterLocation").value;
   return [...worksheets]
     .filter(item => !leader || item.leader === leader)
-    .filter(item => !customer || String(item.customer || "").toLocaleLowerCase("hu-HU").includes(customer) || customerNameKey(customerDirectory.find(entry => entry.id === item.customerId)?.fullName).includes(customerNameKey(customer)))
+    .filter(item => !customer || customerNameKey(item.customer).includes(customerNameKey(customer)) || customerNameKey(customerDirectory.find(entry => entry.id === item.customerId)?.fullName).includes(customerNameKey(customer)))
     .filter(item => !location || officeLocationKey(item) === location)
-    .filter(item => !address || item.address.toLocaleLowerCase("hu-HU").includes(address))
+    .filter(item => !address || searchKey(item.address).includes(address))
     .filter(item => !from || item.date >= from)
     .filter(item => !to || item.date <= to)
     .sort((first, second) => second.date.localeCompare(first.date) || String(second.createdAt || "").localeCompare(String(first.createdAt || "")));
@@ -833,7 +837,7 @@ function customerMatches(query, addressOnly = false) {
     for (const location of locations) {
       const name = customerNameKey(customer.fullName);
       const nameMatch = name.startsWith(needle) || name.split(" ").some(part => part.startsWith(needle));
-      const addressMatch = String(location.address || "").toLocaleLowerCase("hu-HU").includes(needle);
+      const addressMatch = searchKey(location.address).includes(needle);
       if ((addressOnly && addressMatch) || (!addressOnly && nameMatch)) {
         matches.push({ customerId: customer.id, locationId: location.id, name: customer.fullName, address: location.address });
       }
@@ -914,10 +918,10 @@ function customerInitial(name) {
 function customerListPage(customers, query, letter) {
   const available = new Set(customers.map(customer => customerInitial(customer.fullName)));
   const selected = available.has(letter) ? letter : CUSTOMER_LETTERS.find(value => available.has(value)) || "";
-  const needle = String(query || "").trim().toLocaleLowerCase("hu-HU");
+  const needle = searchKey(query);
   const filtered = customers.filter(customer => {
     if (!needle) return customerInitial(customer.fullName) === selected;
-    const searchable = [customer.fullName, customer.email, customer.phone, customer.contactName, ...(customer.locations || []).filter(location => location.active !== false).map(location => location.address)].join(" ").toLocaleLowerCase("hu-HU");
+    const searchable = searchKey([customer.fullName, customer.email, customer.phone, customer.contactName, ...(customer.locations || []).filter(location => location.active !== false).map(location => location.address)].join(" "));
     return searchable.includes(needle);
   }).sort((a, b) => a.fullName.localeCompare(b.fullName, "hu-HU"));
   return { available, selected, filtered, searching: Boolean(needle) };
@@ -997,7 +1001,7 @@ $("#customerForm").addEventListener("submit", async event => {
   const existing = customerDirectory.find(customer => customer.id === customerForm.elements.id.value);
   const addresses = String(customerForm.elements.locations.value || "").split(/\r?\n/).map(value => value.trim()).filter(Boolean);
   const locations = addresses.map(address => {
-    const saved = existing?.locations?.find(location => location.address.toLocaleLowerCase("hu-HU") === address.toLocaleLowerCase("hu-HU"));
+    const saved = existing?.locations?.find(location => searchKey(location.address) === searchKey(address));
     return { id: saved?.id, address, label: saved?.label || "", active: true, reviewStatus: customerForm.elements.approved.checked ? "approved" : "pending" };
   });
   const payload = {
@@ -1176,16 +1180,18 @@ async function deleteWorksheet(id, button) {
 function setManagerView(view) {
   if (session?.role !== "manager") return;
   if (managerView === "budget" && view !== "budget" && !window.Billing?.canLeave()) return;
-  managerView = ["office", "customers", "worksheet", "budget"].includes(view) ? view : "worksheet";
+  managerView = ["office", "customers", "worksheet", "budget", "statistics"].includes(view) ? view : "worksheet";
   officeViewActive = managerView === "office";
   localStorage.setItem(MANAGER_VIEW_KEY, managerView);
   $("#officeView").hidden = !officeViewActive;
   $("#customersView").hidden = managerView !== "customers";
   $("#worksheetView").hidden = managerView !== "worksheet";
   $("#budgetView").hidden = managerView !== "budget";
+  $("#statisticsView").hidden = managerView !== "statistics";
   $("#budgetTab").classList.toggle("active", managerView === "budget");
   $("#officeTab").classList.toggle("active", officeViewActive);
   $("#customersTab").classList.toggle("active", managerView === "customers");
+  $("#statisticsTab").classList.toggle("active", managerView === "statistics");
   $("#worksheetTab").classList.toggle("active", managerView === "worksheet");
   if (officeViewActive) {
     if (officeWeekActive) applyOfficeWeek();
@@ -1198,11 +1204,13 @@ function setManagerView(view) {
     if (!customersLoaded) loadCustomers(true, true);
   }
   if (managerView === "budget") return window.Billing?.show();
+  if (managerView === "statistics") return window.Statistics?.show();
 }
 
 $("#officeTab").addEventListener("click", () => setManagerView("office"));
 $("#customersTab").addEventListener("click", () => setManagerView("customers"));
 $("#budgetTab").addEventListener("click", () => setManagerView("budget"));
+$("#statisticsTab").addEventListener("click", () => setManagerView("statistics"));
 $("#worksheetTab").addEventListener("click", () => setManagerView("worksheet"));
 $("#previousOfficeWeek").addEventListener("click", () => moveOfficeWeek(-7));
 $("#nextOfficeWeek").addEventListener("click", () => moveOfficeWeek(7));
@@ -1410,6 +1418,7 @@ $("#pinField").addEventListener("keydown", event => { if (event.key === "Enter")
 
 async function openApp(profile) {
   window.Billing?.reset();
+  window.Statistics?.reset();
   session = profile;
   customerLetter = "";
   $("#customerAlphabet").innerHTML = "";
@@ -1440,6 +1449,7 @@ async function openApp(profile) {
   if (profile.role !== "manager") {
     $("#officeView").hidden = true;
     $("#customersView").hidden = true;
+    $("#statisticsView").hidden = true;
     $("#worksheetView").hidden = false;
   }
   const now = new Date();
@@ -1466,6 +1476,7 @@ async function logout() {
   const canSwitchProfile = previousSession?.role === "manager" || Boolean(previousSession?.delegatedBy);
   await MunkalapDB.logout();
   window.Billing?.reset();
+  window.Statistics?.reset();
   session = null;
   worksheets = [];
   officeLoaded = false;

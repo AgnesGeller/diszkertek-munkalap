@@ -14,7 +14,7 @@ create table munkalap.billing_drafts (
   source_snapshot jsonb not null check(jsonb_typeof(source_snapshot)='object'),
   items jsonb not null default '[]'::jsonb check(jsonb_typeof(items)='array' and jsonb_array_length(items)<=200),
   notes text not null default '' check(length(notes)<=5000),
-  status text not null default 'draft' check(status in ('draft','ready')),
+  status text not null default 'draft' check(status in ('draft','ready','sent','paid')),
   total numeric(16,2) not null default 0,
   updated_at timestamptz not null default now()
 );
@@ -43,10 +43,10 @@ begin
     end if;
     q:=(item->>'quantity')::numeric; p:=(item->>'unitPrice')::numeric; d:=(item->>'divisor')::numeric;
     if q<0 or q>1000000 or p<0 or p>100000000 then raise exception 'Túl nagy vagy negatív összeg.'; end if;
-    if new.status='ready' and not (item->>'reviewed')::boolean then raise exception 'Minden tétel árát ellenőrizni kell.'; end if;
+    if new.status<>'draft' and not (item->>'reviewed')::boolean then raise exception 'Minden tétel árát ellenőrizni kell.'; end if;
     amount:=amount+q*p/d;
   end loop;
-  if new.status='ready' and jsonb_array_length(new.items)=0 then raise exception 'Üres elszámolás nem véglegesíthető.'; end if;
+  if new.status<>'draft' and jsonb_array_length(new.items)=0 then raise exception 'Üres elszámolás nem véglegesíthető.'; end if;
   new.total:=round(amount,2);
   new.updated_at:=clock_timestamp();
   return new;
