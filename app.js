@@ -1,7 +1,7 @@
 const EMAIL_ENDPOINT = "https://formsubmit.co/ajax/info@diszkertek.hu";
 const EMAIL_RECIPIENT = "info@diszkertek.hu";
 const STABLE_APP_URL = "https://agnesgeller.github.io/diszkertek-munkalap/";
-const APP_VERSION = "31";
+const APP_VERSION = "32";
 const QUEUE_KEY = "diszkertek-munkalap-send-queue-v1";
 const MANAGER_VIEW_KEY = "diszkertek-munkalap-manager-view-v1";
 const DATABASE_FREE_LIMIT = 500 * 1024 * 1024;
