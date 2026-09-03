@@ -6,13 +6,13 @@
   <meta name="theme-color" content="#315f37">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Munkalap">
-  <link rel="manifest" href="manifest.webmanifest?v=29">
+  <link rel="manifest" href="manifest.webmanifest?v=31">
   <link rel="icon" href="munkalap-m-favicon-v12.ico" sizes="any">
   <link rel="icon" href="munkalap-m-icon-32-v12.png" type="image/png" sizes="32x32">
   <link rel="apple-touch-icon" href="munkalap-m-icon-apple-180-v12.png">
-  <link rel="stylesheet" href="styles.css?v=29">
-  <link rel="stylesheet" href="logo-overrides.css?v=29">
-  <link rel="stylesheet" href="app-shell.css?v=29">
+  <link rel="stylesheet" href="styles.css?v=31">
+  <link rel="stylesheet" href="logo-overrides.css?v=31">
+  <link rel="stylesheet" href="app-shell.css?v=31">
   <title>Díszkertek – Napi munkalap</title>
   <meta name="description" content="Díszkertek napi munkalapok és ügyfélnyilvántartás.">
   <meta property="og:title" content="Díszkertek – Napi munkalap">
@@ -189,8 +189,10 @@
         <button id="showAllBudgetWeeks" type="button">Összes hét</button>
       </nav>
       <label class="budget-sheet-search">Munkalap keresése<input id="budgetSheetSearch" type="search" placeholder="Ügyfél, cím vagy csoportvezető"></label>
+      <div class="budget-date-filter"><label>Dátumtól<input id="budgetFrom" type="date"></label><label>Dátumig<input id="budgetTo" type="date"></label><button id="budgetClearDates" type="button">Heti nézet</button></div>
       <p id="budgetSheetCount" class="budget-sheet-count"></p>
       <div id="budgetSheetList" class="budget-sheet-list"></div>
+      <div class="budget-selection-bar"><strong id="budgetSelectionCount">Jelöld ki az elszámolandó munkalapokat.</strong><button id="budgetCreateSettlement" type="button" disabled>Kijelöltek elszámolása</button></div>
       <select id="budgetSheet" hidden aria-label="Kiválasztott munkalap"><option value="">Válassz munkalapot</option></select>
       </div>
       <form id="budgetForm" class="budget-paper" hidden>
@@ -199,18 +201,20 @@
           <div><span>ELSZÁMOLÁS</span><h3 id="budgetHeading"></h3></div>
           <p class="budget-total"><small>Számított érték</small><strong id="budgetTotal"></strong></p>
         </header>
+        <p id="budgetLocations" class="budget-locations"></p>
         <p id="budgetSourceWarning" class="budget-warning" hidden></p>
         <p id="budgetFlat" class="budget-flat" hidden></p>
         <div id="budgetItems"></div>
         <details class="budget-add-item">
           <summary>+ Tétel hozzáadása</summary>
           <div class="budget-toolbar">
-            <label>Válassz az árlistából<select id="budgetCatalog"><option value="">Válassz tételt</option></select></label>
-            <button id="budgetAddCatalog" type="button">Kiválasztott tétel hozzáadása</button>
+            <div><b>Jelöld ki a tételeket</b><div id="budgetCatalogList" class="budget-catalog-list"></div></div>
+            <button id="budgetAddCatalog" type="button">Kijelölt tételek hozzáadása</button>
           </div>
           <button id="budgetAdd" type="button">+ Saját tétel</button>
         </details>
         <label>Megjegyzés<textarea id="budgetNotes" maxlength="5000" rows="3"></textarea></label>
+        <section class="budget-discount"><label>Kedvezmény<select id="budgetDiscountType"><option value="none">Nincs kedvezmény</option><option value="amount">Konkrét összeg</option><option value="percent">Százalék</option></select></label><label>Érték<input id="budgetDiscountValue" type="number" min="0" step="0.01" value="0" disabled></label><p><span>Munkák összesen</span><b id="budgetSubtotal">0 Ft</b><span>Kedvezmény</span><b id="budgetDiscountTotal">0 Ft</b></p></section>
         <label>Állapot<select id="budgetState"><option value="draft">Piszkozat</option><option value="ready">Ellenőrizve</option><option value="sent">Elküldve</option><option value="paid">Kifizetve</option></select></label>
         <p id="budgetStateHelp" class="budget-state-help">Piszkozat: elmenthető, de még szerkesztés alatt áll.</p>
         <p id="budgetSaveStatus" class="budget-save-status" role="status" aria-live="polite"></p>
@@ -251,7 +255,7 @@
         <div><span>Elküldött</span><b id="statisticsSent">0 Ft</b></div>
         <div><span>Kifizetett</span><b id="statisticsPaid">0 Ft</b></div>
       </section>
-      <div class="statistics-table-wrap"><table class="statistics-table"><thead><tr><th>Ügyfél</th><th>Helyszín</th><th>Darab</th><th>Számított érték</th><th>Elküldött</th><th>Kifizetett</th></tr></thead><tbody id="statisticsRows"></tbody></table></div>
+      <div class="statistics-table-wrap"><table class="statistics-table"><thead><tr><th>Dátum / időszak</th><th>Ügyfél</th><th>Helyszín</th><th>Munkalap</th><th>Összeg</th><th>Állapot</th><th></th></tr></thead><tbody id="statisticsRows"></tbody></table></div>
     </section>
 
     <footer class="company-footer">
@@ -298,12 +302,12 @@
   </dialog>
   <dialog id="successDialog"><h2>Köszönöm, hogy beküldted a Munkalapot 😊</h2><p>Nagyon Cuki vagy ❤️</p><button id="newWorksheet" type="button">Új munkalap</button></dialog>
 
-  <script src="supabase.js?v=30"></script>
-  <script src="supabase-config.js?v=30"></script>
-  <script src="munkalap-data.js?v=30"></script>
-  <script src="app.js?v=30"></script>
-  <script src="billing-math.js?v=30"></script>
-  <script src="billing.js?v=30"></script>
-  <script src="statistics.js?v=30"></script>
+  <script src="supabase.js?v=31"></script>
+  <script src="supabase-config.js?v=31"></script>
+  <script src="munkalap-data.js?v=31"></script>
+  <script src="app.js?v=31"></script>
+  <script src="billing-math.js?v=31"></script>
+  <script src="billing-settlements.js?v=31"></script>
+  <script src="statistics-settlements.js?v=31"></script>
 </body>
 </html>

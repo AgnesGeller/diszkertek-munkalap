@@ -1,6 +1,6 @@
-const CACHE="diszkertek-onallo-munkalap-v30";
-const OFFLINE_PAGE="./index.html?v=30";
-const ASSETS=[OFFLINE_PAGE,"./styles.css?v=30","./logo-overrides.css?v=30","./app-shell.css?v=30","./app.js?v=30","./billing-math.js?v=30","./billing.js?v=30","./statistics.js?v=30","./supabase.js?v=30","./supabase-config.js?v=30","./munkalap-data.js?v=30","./manifest.webmanifest?v=30","./official-logo.png","./official-emblem.png","./botanical.svg","./official-icon-192.png","./munkalap-m-icon-32-v12.png","./munkalap-m-icon-192-v12.png","./munkalap-m-icon-512-v12.png","./munkalap-m-icon-maskable-512-v12.png","./munkalap-m-icon-apple-180-v12.png","./munkalap-m-favicon-v12.ico"];
+const CACHE="diszkertek-onallo-munkalap-v31";
+const OFFLINE_PAGE="./index.html?v=31";
+const ASSETS=[OFFLINE_PAGE,"./styles.css?v=31","./logo-overrides.css?v=31","./app-shell.css?v=31","./app.js?v=31","./billing-math.js?v=31","./billing-settlements.js?v=31","./statistics-settlements.js?v=31","./supabase.js?v=31","./supabase-config.js?v=31","./munkalap-data.js?v=31","./manifest.webmanifest?v=31","./official-logo.png","./official-emblem.png","./botanical.svg","./official-icon-192.png","./munkalap-m-icon-32-v12.png","./munkalap-m-icon-192-v12.png","./munkalap-m-icon-512-v12.png","./munkalap-m-icon-maskable-512-v12.png","./munkalap-m-icon-apple-180-v12.png","./munkalap-m-favicon-v12.ico"];
 self.addEventListener("install",event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting())));
 self.addEventListener("activate",event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
 self.addEventListener("fetch",event=>{
