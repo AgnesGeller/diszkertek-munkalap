@@ -6,6 +6,7 @@ create table munkalap.billing_prices (
   unit text not null,
   unit_price numeric(12,2) not null check(unit_price >= 0 and unit_price <= 100000000),
   confirmed boolean not null default false,
+  active boolean not null default true,
   updated_at timestamptz not null default now()
 );
 create table munkalap.billing_drafts (

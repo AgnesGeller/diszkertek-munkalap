@@ -579,6 +579,19 @@
       return data;
     },
 
+    async removeBillingPrice(price) {
+      if (previewMode) {
+        if (previewProfile?.role !== 'manager') throw new Error('Nincs jogosultság.');
+        const row={...price,active:false,updated_at:new Date().toISOString()};
+        previewPrices=previewPrices.map(p=>p.code===price.code?row:p);return structuredClone(row);
+      }
+      const {data,error}=await client.from('billing_prices').update({active:false})
+        .eq('code',price.code).eq('updated_at',price.updated_at).select('*').maybeSingle();
+      if(error) throw error;
+      if(!data) throw new Error('A tételt közben más módosította, vagy nincs jogosultságod. Töltsd újra az árlistát.');
+      return data;
+    },
+
     async billingDraft(id) {
       if (previewMode) {
         if (previewProfile?.role !== 'manager') throw new Error('Nincs jogosultság.');
