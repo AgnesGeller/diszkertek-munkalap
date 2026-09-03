@@ -19,8 +19,9 @@ button{font-family:Arial,sans-serif}
 .login-status{min-height:20px;color:#8a2822!important;font:14px Arial,sans-serif!important}
 .active-user{margin:8px 0 0;color:var(--green);font:bold 13px Arial,sans-serif}
 .manager-tabs{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:22px 0}
-.manager-tabs button{min-height:48px;border:1px solid var(--green);border-radius:13px;color:var(--green);background:#fff;font:bold 15px Arial,sans-serif;cursor:pointer}
+.manager-tabs button{min-height:40px;padding:7px 12px;border:1px solid var(--green);border-radius:9px;color:var(--green);background:#fff;font:bold 14px Arial,sans-serif;cursor:pointer}
 .manager-tabs button.active{color:#fff;background:var(--green);box-shadow:0 5px 16px rgba(49,95,55,.2)}
+.manager-tabs #customersTab{border-color:#b9a6cf;color:#543b6c;background:#eee8f5}.manager-tabs #customersTab.active{color:#342044;background:#cfbfdf;box-shadow:0 3px 10px rgba(84,59,108,.18)}
 .office-week-navigation{display:grid;grid-template-columns:58px minmax(210px,1fr) 58px auto;align-items:center;gap:12px;margin:22px 0;padding:16px;border:2px solid var(--green);border-radius:16px;background:linear-gradient(135deg,#edf6ef,#dcecdf);box-shadow:0 6px 18px rgba(49,95,55,.16)}
 .office-week-navigation>button:not(.small-button){min-height:54px;border:0;border-radius:14px;color:#fff;background:var(--green);box-shadow:0 4px 10px rgba(49,95,55,.22);font:bold 34px/1 Arial,sans-serif;cursor:pointer}
 .office-week-navigation>button:not(.small-button):active{transform:scale(.96)}
@@ -61,32 +62,33 @@ button{font-family:Arial,sans-serif}
 .office-filters button{align-self:end;min-height:42px}
 .office-filters label{min-width:0}
 .office-scope{font-weight:bold;color:var(--green);overflow-wrap:anywhere}
-.manager-tabs .budget-tab,.card-actions .budget-tab{border-color:#c32631;color:#ae1520}
-.manager-tabs .budget-tab.active{background:#c32631;color:white}
-.budget-view{margin:24px 0;padding:22px;border-top:6px solid #c32631;background:#fffafa}
-.budget-view h2,.budget-view h3{color:#ae1520}
+.manager-tabs .budget-tab,.card-actions .budget-tab{border-color:#d97706;color:#9a4c00}
+.manager-tabs .budget-tab.active{background:#d97706;color:white}
+.budget-view{margin:24px 0;padding:22px;border-top:5px solid #d97706;background:#fffaf2}
+.budget-view h2,.budget-view h3{color:#8a4300}
 .budget-view label{display:grid;gap:6px;min-width:0;font:14px Arial,sans-serif}
 .budget-view input:not([type=checkbox]),.budget-view select,.budget-view textarea{width:100%;min-height:44px;border:1px solid #cda7aa;padding:9px;border-radius:5px;box-sizing:border-box;font:15px Arial,sans-serif}
-.budget-view button{min-height:44px;padding:10px 15px;background:#b51f2b;color:white;border:0;border-radius:5px;cursor:pointer}
+.budget-view button{min-height:38px;padding:7px 12px;background:#d97706;color:white;border:0;border-radius:5px;cursor:pointer}
 .budget-view button:disabled{opacity:.5;cursor:wait}
 .budget-toolbar{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:12px}
-.budget-view details{margin:22px 0}.budget-view summary{padding:12px 0;font-weight:bold;cursor:pointer}
-#budgetPrices>summary{display:list-item;width:fit-content;max-width:100%;box-sizing:border-box;padding:15px 22px;background:#694092;color:#fff;border:2px solid #4b276f;border-radius:6px;box-shadow:0 3px 0 #4b276f;font:700 17px Arial,sans-serif}
-#budgetPrices>summary:hover{background:#523071}#budgetPrices>summary:focus-visible{outline:3px solid #c58618;outline-offset:3px}
+.budget-mode-tabs{display:flex;gap:8px;margin:10px 0 16px}.budget-view .budget-mode-tabs button{min-height:36px;padding:7px 16px;color:#8a4300;background:#fff;border:1px solid #d97706;font-weight:700}.budget-view .budget-mode-tabs button.active{color:#fff;background:#d97706}
+#budgetPrices{margin-top:10px}
+.budget-add-item{margin:14px 0;border:1px solid #e3b778;background:#fff}.budget-add-item>summary{padding:10px 12px;color:#8a4300;font:700 14px Arial,sans-serif;cursor:pointer}.budget-add-item[open]>summary{border-bottom:1px solid #ecd0ab}.budget-add-item>.budget-toolbar{padding:12px}.budget-add-item>#budgetAdd{margin:0 12px 12px}
 #budgetPriceSearch{margin:8px 0 12px}.budget-price[hidden]{display:none!important}
 #budgetPriceList{max-height:56vh;overflow:auto;border:1px solid #dfbdc0;padding:0 14px;background:#fff;overscroll-behavior:contain}
-.budget-week-navigation{display:grid;grid-template-columns:58px minmax(210px,1fr) 58px auto;align-items:center;gap:10px;margin:16px 0;padding:14px;border:2px solid #b51f2b;background:#fff}
-.budget-week-navigation>div{display:grid;gap:4px;text-align:center}.budget-week-navigation span{color:#9c1722;font:700 12px Arial,sans-serif;letter-spacing:.1em}.budget-week-navigation b{font:800 18px Arial,sans-serif}.budget-week-navigation>button{font-weight:700}.budget-week-navigation>button:first-child,.budget-week-navigation>button:nth-child(3){font-size:30px}
+.budget-week-navigation{display:grid;grid-template-columns:46px minmax(210px,1fr) 46px auto;align-items:center;gap:8px;margin:12px 0;padding:10px;border:1px solid #d97706;background:#fff}
+.budget-week-navigation>div{display:grid;gap:3px;text-align:center}.budget-week-navigation span{color:#9a4c00;font:700 11px Arial,sans-serif;letter-spacing:.1em}.budget-week-navigation b{font:800 16px Arial,sans-serif}.budget-week-navigation>button{font-weight:700}.budget-week-navigation>button:first-child,.budget-week-navigation>button:nth-child(3){font-size:24px;padding:4px}
 .budget-sheet-search{margin:14px 0 6px}.budget-sheet-count{font-weight:700}.budget-sheet-list{display:grid;gap:8px;max-height:42vh;overflow:auto;padding:4px;border:1px solid #dfbdc0;background:#fff;overscroll-behavior:contain}
-.budget-view .budget-sheet-list button{display:grid;gap:3px;width:100%;min-height:76px;text-align:left;background:#fff;color:#3a171a;border:1px solid #e2c5c8;border-left:6px solid #b51f2b}.budget-sheet-list button:hover,.budget-sheet-list button:focus-visible{background:#fff1f2}.budget-sheet-list b{font-size:16px}.budget-sheet-list span{font-size:14px}.budget-sheet-list small{color:#70575a}
+.budget-view .budget-sheet-list button{display:grid;gap:2px;width:100%;min-height:60px;padding:8px 11px;text-align:left;background:#fff;color:#3f2b17;border:1px solid #ecd0ab;border-left:5px solid #d97706}.budget-sheet-list button:hover,.budget-sheet-list button:focus-visible{background:#fff4e5}.budget-sheet-list b{font-size:15px}.budget-sheet-list span{font-size:13px}.budget-sheet-list small{color:#705b44}
 .budget-price{display:grid;grid-template-columns:minmax(0,1fr) 150px auto auto;align-items:end;gap:12px;padding:12px 0;border-bottom:1px solid #edd0d2}
-.budget-view .budget-delete-price{background:#fff;color:#a01823;border:1px solid #a01823}
+.budget-view .budget-delete-price{background:#fff;color:#8a4300;border:1px solid #b96b1c}
 .budget-view .budget-check{display:flex;align-items:center;gap:8px;min-height:44px}.budget-check input{width:20px;height:20px}
 .budget-item{display:grid;grid-template-columns:1fr 1fr;gap:12px;border:1px solid #dfbdc0;margin:18px 0;padding:16px;min-width:0}
-.budget-item-name{grid-column:1/-1}.budget-item legend{color:#a31823;font-weight:bold}
+.budget-item-name{grid-column:1/-1}.budget-item legend{color:#8a4300;font-weight:bold}
 .budget-total{font-size:20px;text-align:right}.budget-flat{padding:12px;background:#fff0d1;color:#563c00;line-height:1.5}
 .budget-warning{color:#ac1725;font-weight:bold;line-height:1.5}
 #budgetForm>label{margin:14px 0}#budgetSave{width:100%;font-weight:bold}
+.budget-result-actions{display:flex;gap:8px;margin-top:10px}.budget-result-actions button{flex:1}
 @media(max-width:600px){.budget-view{padding:14px 8px}.budget-toolbar,.budget-price{grid-template-columns:1fr}.budget-item{padding:10px}.budget-total{text-align:left;font-size:18px}.budget-week-navigation{grid-template-columns:52px 1fr 52px}.budget-week-navigation>button:last-child{grid-column:1/-1}.budget-sheet-list{max-height:48vh}#budgetPriceList{max-height:52vh}}
 .office-actions{display:flex;flex-wrap:wrap;gap:10px;margin:18px 0}
 .office-status{min-height:20px;margin:8px 0;color:var(--muted);font:13px/1.4 Arial,sans-serif}
@@ -108,6 +110,7 @@ button{font-family:Arial,sans-serif}
 .print-worksheet header img{width:270px;height:110px;object-fit:contain}
 .print-worksheet h1,.print-worksheet h2,.print-worksheet h3{color:#315f37}
 .print-worksheet footer{margin-top:25px;padding-top:12px;border-top:1px solid #91a498;text-align:center;color:#607065}
+.print-settlement{max-width:190mm;margin:auto;padding:14mm 16mm;color:#243328;background:#fff;font:14px/1.45 Arial,sans-serif}.print-settlement header{display:flex;align-items:center;justify-content:space-between;padding-bottom:8mm;border-bottom:2px solid #315f37}.print-settlement header img{width:62mm;height:25mm;object-fit:contain;object-position:left center}.print-settlement header div{display:grid;gap:4px;text-align:right}.print-settlement header span{color:#315f37;font:700 20px Georgia,serif;letter-spacing:.12em}.print-settlement header b{font-size:13px}.settlement-customer{display:grid;grid-template-columns:1fr 1fr;gap:10mm;margin:8mm 0;padding:5mm 0;border-bottom:1px solid #c9d4cb}.settlement-customer p{display:grid;gap:3px;margin:0}.settlement-customer small{color:#607065;text-transform:uppercase;letter-spacing:.08em}.print-settlement section{margin:7mm 0}.print-settlement h2{margin:0 0 3mm;color:#315f37;font:700 16px Georgia,serif}.print-settlement p{margin:2mm 0}.print-settlement table{width:100%;border-collapse:collapse}.print-settlement th,.print-settlement td{padding:3mm 2mm;border-bottom:1px solid #dfe5e0;text-align:left}.print-settlement th{color:#315f37;background:#f1f5f2;font-size:12px}.print-settlement th:last-child,.print-settlement td:last-child{text-align:right}.settlement-labor{display:flex;justify-content:space-between;margin-top:4mm!important;padding:4mm;background:#f1f5f2}.settlement-total{display:flex;align-items:center;justify-content:space-between;margin-top:9mm;padding:5mm 0;border-top:3px solid #315f37;color:#315f37;font-size:20px}.settlement-total b{font-size:24px}.print-settlement footer{display:grid;gap:3mm;margin-top:11mm;padding-top:6mm;border-top:1px solid #91a498;text-align:center;color:#526358}.print-settlement footer b{color:#315f37;font:700 16px Georgia,serif}
 
 @media(max-width:760px){
   .preview-banner{margin:-14px -14px 12px}
@@ -139,4 +142,7 @@ button{font-family:Arial,sans-serif}
   body.print-office #worksheetView{display:none!important}
   body.print-office #officeView{display:block!important}
   body.print-office .worksheet-card{break-inside:avoid;box-shadow:none}
+  body.print-budget .login-view,body.print-budget .sheet,body.print-budget #printWorksheet{display:none!important}
+  body.print-budget #printSettlement{display:block!important}
+  body.print-budget{background:#fff}.print-settlement{padding:8mm 10mm}.print-settlement section,.print-settlement tr{break-inside:avoid}
 }
