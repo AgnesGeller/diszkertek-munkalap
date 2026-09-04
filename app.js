@@ -1,7 +1,7 @@
 const EMAIL_ENDPOINT = "https://formsubmit.co/ajax/info@diszkertek.hu";
 const EMAIL_RECIPIENT = "info@diszkertek.hu";
 const STABLE_APP_URL = "https://agnesgeller.github.io/diszkertek-munkalap/";
-const APP_VERSION = "34";
+const APP_VERSION = "35";
 const QUEUE_KEY = "diszkertek-munkalap-send-queue-v1";
 const MANAGER_VIEW_KEY = "diszkertek-munkalap-manager-view-v1";
 const DATABASE_FREE_LIMIT = 500 * 1024 * 1024;
@@ -1117,7 +1117,7 @@ function fillFormFromWorksheet(item, returnView = "") {
   selectedLocationId = item.locationId || null;
   form.querySelector(".submit-button").textContent = "Módosítás mentése";
   $("#cancelEdit").hidden = false;
-  $("#cancelEdit").textContent = returnView === "statistics" ? "Vissza a statisztikához" : returnView === "office" ? "Vissza az irodához" : "Szerkesztés megszakítása";
+  $("#cancelEdit").textContent = returnView === "statistics" ? "Vissza a statisztikához" : returnView === "budget" ? "Vissza a költségvetéshez" : returnView === "office" ? "Vissza az irodához" : "Szerkesztés megszakítása";
   setManagerView("worksheet");
   form.scrollIntoView({ behavior: "smooth", block: "start" });
 }
