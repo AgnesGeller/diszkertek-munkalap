@@ -1,7 +1,7 @@
 const EMAIL_ENDPOINT = "https://formsubmit.co/ajax/info@diszkertek.hu";
 const EMAIL_RECIPIENT = "info@diszkertek.hu";
 const STABLE_APP_URL = "https://agnesgeller.github.io/diszkertek-munkalap/";
-const APP_VERSION = "32";
+const APP_VERSION = "33";
 const QUEUE_KEY = "diszkertek-munkalap-send-queue-v1";
 const MANAGER_VIEW_KEY = "diszkertek-munkalap-manager-view-v1";
 const DATABASE_FREE_LIMIT = 500 * 1024 * 1024;
@@ -917,10 +917,10 @@ function customerInitial(name) {
 
 function customerListPage(customers, query, letter) {
   const available = new Set(customers.map(customer => customerInitial(customer.fullName)));
-  const selected = available.has(letter) ? letter : CUSTOMER_LETTERS.find(value => available.has(value)) || "";
+  const selected = available.has(letter) ? letter : "";
   const needle = searchKey(query);
   const filtered = customers.filter(customer => {
-    if (!needle) return customerInitial(customer.fullName) === selected;
+    if (!needle) return !selected || customerInitial(customer.fullName) === selected;
     const searchable = searchKey([customer.fullName, customer.email, customer.phone, customer.contactName, ...(customer.locations || []).filter(location => location.active !== false).map(location => location.address)].join(" "));
     return searchable.includes(needle);
   }).sort((a, b) => a.fullName.localeCompare(b.fullName, "hu-HU"));
@@ -931,7 +931,7 @@ function renderCustomers() {
   if (session?.role !== "manager") return;
   const { available, selected, filtered, searching } = customerListPage(customerDirectory, $("#customerSearch").value, customerLetter);
   customerLetter = selected;
-  $("#customerAlphabet").innerHTML = CUSTOMER_LETTERS.filter(letter => letter !== "#" || available.has(letter)).map(letter => `<button type="button" data-customer-letter="${letter}" aria-label="${letter} betűs ügyfelek" aria-pressed="${!searching && letter === selected}" ${available.has(letter) ? "" : "disabled"}>${letter}</button>`).join("");
+  $("#customerAlphabet").innerHTML = `<button type="button" data-customer-letter="" aria-label="Minden ügyfél" aria-pressed="${!searching && !selected}">Mind</button>` + CUSTOMER_LETTERS.filter(letter => letter !== "#" || available.has(letter)).map(letter => `<button type="button" data-customer-letter="${letter}" aria-label="${letter} betűs ügyfelek" aria-pressed="${!searching && letter === selected}" ${available.has(letter) ? "" : "disabled"}>${letter}</button>`).join("");
   $("#customersCount").textContent = `${filtered.length} / ${customerDirectory.length} ügyfél`;
   $("#customersList").innerHTML = filtered.length ? filtered.map(customer => `
     <article class="customer-card">

@@ -6,13 +6,13 @@
   <meta name="theme-color" content="#315f37">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Munkalap">
-  <link rel="manifest" href="manifest.webmanifest?v=32">
+  <link rel="manifest" href="manifest.webmanifest?v=33">
   <link rel="icon" href="munkalap-m-favicon-v12.ico" sizes="any">
   <link rel="icon" href="munkalap-m-icon-32-v12.png" type="image/png" sizes="32x32">
   <link rel="apple-touch-icon" href="munkalap-m-icon-apple-180-v12.png">
-  <link rel="stylesheet" href="styles.css?v=32">
-  <link rel="stylesheet" href="logo-overrides.css?v=32">
-  <link rel="stylesheet" href="app-shell.css?v=32">
+  <link rel="stylesheet" href="styles.css?v=33">
+  <link rel="stylesheet" href="logo-overrides.css?v=33">
+  <link rel="stylesheet" href="app-shell.css?v=33">
   <title>Díszkertek – Napi munkalap</title>
   <meta name="description" content="Díszkertek napi munkalapok és ügyfélnyilvántartás.">
   <meta property="og:title" content="Díszkertek – Napi munkalap">
@@ -128,7 +128,7 @@
         <button id="newCustomer" class="primary-button" type="button">Új ügyfél</button>
       </div>
       <label class="customer-search"><span>Ügyfél keresése</span><input id="customerSearch" type="search" autocomplete="off" placeholder="Név, cím, e-mail vagy telefonszám"></label>
-      <nav id="customerAlphabet" class="customer-alphabet" aria-label="Ügyfelek kezdőbetű szerint"></nav>
+      <details class="customer-alphabet-details"><summary>ABC szerinti szűrés</summary><nav id="customerAlphabet" class="customer-alphabet" aria-label="Ügyfelek kezdőbetű szerint"></nav></details>
       <p id="customersStatus" class="office-status" role="status" aria-live="polite"></p>
       <p id="customersCount" class="office-count"></p>
       <div id="customersList" class="customer-list"></div>
@@ -250,8 +250,8 @@
       </section>
       <p id="statisticsStatus" class="office-status" role="status" aria-live="polite"></p>
       <section class="statistics-summary" aria-label="Összesítés">
-        <div><span>Elszámolások</span><b id="statisticsCount">0</b></div>
-        <div><span>Számított érték</span><b id="statisticsTotal">0 Ft</b></div>
+        <div><span>Piszkozat</span><b id="statisticsDraft">0 Ft</b></div>
+        <div><span>Ellenőrizve</span><b id="statisticsReady">0 Ft</b></div>
         <div><span>Elküldött</span><b id="statisticsSent">0 Ft</b></div>
         <div><span>Kifizetett</span><b id="statisticsPaid">0 Ft</b></div>
       </section>
@@ -302,12 +302,12 @@
   </dialog>
   <dialog id="successDialog"><h2>Köszönöm, hogy beküldted a Munkalapot 😊</h2><p>Nagyon Cuki vagy ❤️</p><button id="newWorksheet" type="button">Új munkalap</button></dialog>
 
-  <script src="supabase.js?v=32"></script>
-  <script src="supabase-config.js?v=32"></script>
-  <script src="munkalap-data.js?v=32"></script>
-  <script src="app.js?v=32"></script>
-  <script src="billing-math.js?v=32"></script>
-  <script src="billing-settlements.js?v=32"></script>
-  <script src="statistics-settlements.js?v=32"></script>
+  <script src="supabase.js?v=33"></script>
+  <script src="supabase-config.js?v=33"></script>
+  <script src="munkalap-data.js?v=33"></script>
+  <script src="app.js?v=33"></script>
+  <script src="billing-math.js?v=33"></script>
+  <script src="billing-settlements.js?v=33"></script>
+  <script src="statistics-settlements.js?v=33"></script>
 </body>
 </html>
