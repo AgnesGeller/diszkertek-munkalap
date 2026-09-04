@@ -4,7 +4,7 @@
   "description": "Díszkertek napi munkalap kitöltése és elküldése.",
   "lang": "hu",
   "id": "./",
-  "start_url": "./?app-version=33",
+  "start_url": "./?app-version=34",
   "scope": "./",
   "display": "standalone",
   "background_color": "#e8f0ec",

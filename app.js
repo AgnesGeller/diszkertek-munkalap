@@ -1,7 +1,7 @@
 const EMAIL_ENDPOINT = "https://formsubmit.co/ajax/info@diszkertek.hu";
 const EMAIL_RECIPIENT = "info@diszkertek.hu";
 const STABLE_APP_URL = "https://agnesgeller.github.io/diszkertek-munkalap/";
-const APP_VERSION = "33";
+const APP_VERSION = "34";
 const QUEUE_KEY = "diszkertek-munkalap-send-queue-v1";
 const MANAGER_VIEW_KEY = "diszkertek-munkalap-manager-view-v1";
 const DATABASE_FREE_LIMIT = 500 * 1024 * 1024;
@@ -41,6 +41,7 @@ let session = null;
 let selectedProfile = "";
 let worksheets = [];
 let editingId = null;
+let worksheetReturnView = "";
 let formDirty = false;
 let installPrompt = null;
 let serviceWorkerRegistration = null;
@@ -418,6 +419,7 @@ function resetForm(options = {}) {
   const preserveFallback = Boolean(options.preserveFallback);
   form.reset();
   editingId = null;
+  worksheetReturnView = "";
   pendingCurrentQueueId = null;
   formDirty = false;
   selectedCustomerId = null;
@@ -426,6 +428,7 @@ function resetForm(options = {}) {
   form.elements.date.value = formatHungarianDate(isoToday());
   form.querySelector(".submit-button").textContent = "Munkalap elküldése";
   $("#cancelEdit").hidden = true;
+  $("#cancelEdit").textContent = "Szerkesztés megszakítása";
   clearStatus();
   if (!preserveFallback) {
     fallbackEmailContext = null;
@@ -1099,9 +1102,10 @@ async function loadOfficeWorksheets(showErrors = true) {
   }
 }
 
-function fillFormFromWorksheet(item) {
+function fillFormFromWorksheet(item, returnView = "") {
   resetForm();
   editingId = item.id;
+  worksheetReturnView = returnView;
   for (const [name, value] of Object.entries(item.data || {})) {
     if (form.elements[name]) form.elements[name].value = value ?? "";
   }
@@ -1113,14 +1117,16 @@ function fillFormFromWorksheet(item) {
   selectedLocationId = item.locationId || null;
   form.querySelector(".submit-button").textContent = "Módosítás mentése";
   $("#cancelEdit").hidden = false;
+  $("#cancelEdit").textContent = returnView === "statistics" ? "Vissza a statisztikához" : returnView === "office" ? "Vissza az irodához" : "Szerkesztés megszakítása";
   setManagerView("worksheet");
   form.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
-function openWorksheetForEdit(id) {
+function openWorksheetForEdit(id, returnView = managerView === "worksheet" ? "" : managerView) {
   const item = worksheets.find(worksheet => worksheet.id === id);
-  if (item) fillFormFromWorksheet(item);
+  if (item) fillFormFromWorksheet(item, returnView);
 }
+window.openWorksheetForEdit = openWorksheetForEdit;
 
 $("#recentWorksheets").addEventListener("click", event => {
   const button = event.target.closest("[data-edit]");
@@ -1530,7 +1536,11 @@ $("#reloadHistory").addEventListener("click", async () => {
 $("#clearForm").addEventListener("click", () => {
   if (confirm("Biztosan törlöd a teljes munkalapot?")) resetForm();
 });
-$("#cancelEdit").addEventListener("click", () => resetForm());
+$("#cancelEdit").addEventListener("click", () => {
+  const returnView = worksheetReturnView;
+  resetForm();
+  if (returnView) setManagerView(returnView);
+});
 $("#newWorksheet").addEventListener("click", () => {
   $("#successDialog").close();
   resetForm();

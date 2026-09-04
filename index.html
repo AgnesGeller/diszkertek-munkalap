@@ -6,13 +6,13 @@
   <meta name="theme-color" content="#315f37">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Munkalap">
-  <link rel="manifest" href="manifest.webmanifest?v=33">
+  <link rel="manifest" href="manifest.webmanifest?v=34">
   <link rel="icon" href="munkalap-m-favicon-v12.ico" sizes="any">
   <link rel="icon" href="munkalap-m-icon-32-v12.png" type="image/png" sizes="32x32">
   <link rel="apple-touch-icon" href="munkalap-m-icon-apple-180-v12.png">
-  <link rel="stylesheet" href="styles.css?v=33">
-  <link rel="stylesheet" href="logo-overrides.css?v=33">
-  <link rel="stylesheet" href="app-shell.css?v=33">
+  <link rel="stylesheet" href="styles.css?v=34">
+  <link rel="stylesheet" href="logo-overrides.css?v=34">
+  <link rel="stylesheet" href="app-shell.css?v=34">
   <title>Díszkertek – Napi munkalap</title>
   <meta name="description" content="Díszkertek napi munkalapok és ügyfélnyilvántartás.">
   <meta property="og:title" content="Díszkertek – Napi munkalap">
@@ -234,7 +234,7 @@
     </section>
 
     <section id="statisticsView" class="statistics-view" hidden>
-      <div class="statistics-heading"><h2>Statisztika</h2><p>A mentett elszámolások számított értékei.</p></div>
+      <div class="statistics-heading"><h2>Statisztika</h2><p>Minden kitöltött munkalap és a hozzá tartozó elszámolás állapota.</p></div>
       <nav class="statistics-periods" aria-label="Statisztikai időszak">
         <button type="button" data-stat-period="day">Mai nap</button>
         <button type="button" data-stat-period="week">Aktuális hét</button>
@@ -246,16 +246,16 @@
         <label>Dátumig<input id="statisticsTo" type="date"></label>
         <label>Ügyfél<select id="statisticsCustomer"><option value="">Minden ügyfél</option></select></label>
         <label>Helyszín<select id="statisticsLocation"><option value="">Minden helyszín</option></select></label>
-        <label>Állapot<select id="statisticsState"><option value="">Minden állapot</option><option value="draft">Piszkozat</option><option value="ready">Ellenőrizve</option><option value="sent">Elküldve</option><option value="paid">Kifizetve</option></select></label>
+        <label>Elszámolás állapota<select id="statisticsState"><option value="">Minden állapot</option><option value="none">Nincs még elszámolás</option><option value="draft">Piszkozat</option><option value="ready">Ellenőrizve</option><option value="sent">Elküldve</option><option value="paid">Kifizetve</option></select></label>
       </section>
       <p id="statisticsStatus" class="office-status" role="status" aria-live="polite"></p>
       <section class="statistics-summary" aria-label="Összesítés">
-        <div><span>Piszkozat</span><b id="statisticsDraft">0 Ft</b></div>
-        <div><span>Ellenőrizve</span><b id="statisticsReady">0 Ft</b></div>
-        <div><span>Elküldött</span><b id="statisticsSent">0 Ft</b></div>
+        <div><span>Kitöltött munkalap</span><b id="statisticsWorksheetCount">0</b></div>
+        <div><span>Elszámolás nélkül</span><b id="statisticsUnsettledCount">0</b></div>
+        <div><span>Még nem kifizetett</span><b id="statisticsOutstanding">0 Ft</b></div>
         <div><span>Kifizetett</span><b id="statisticsPaid">0 Ft</b></div>
       </section>
-      <div class="statistics-table-wrap"><table class="statistics-table"><thead><tr><th>Dátum / időszak</th><th>Ügyfél</th><th>Helyszín</th><th>Munkalap</th><th>Összeg</th><th>Állapot</th><th></th></tr></thead><tbody id="statisticsRows"></tbody></table></div>
+      <div class="statistics-table-wrap"><table class="statistics-table"><thead><tr><th>Dátum</th><th>Ügyfél</th><th>Helyszín</th><th>Csoportvezető</th><th>Számított érték</th><th>Elszámolás</th><th>Megnyitás</th></tr></thead><tbody id="statisticsRows"></tbody></table></div>
     </section>
 
     <footer class="company-footer">
@@ -302,12 +302,12 @@
   </dialog>
   <dialog id="successDialog"><h2>Köszönöm, hogy beküldted a Munkalapot 😊</h2><p>Nagyon Cuki vagy ❤️</p><button id="newWorksheet" type="button">Új munkalap</button></dialog>
 
-  <script src="supabase.js?v=33"></script>
-  <script src="supabase-config.js?v=33"></script>
-  <script src="munkalap-data.js?v=33"></script>
-  <script src="app.js?v=33"></script>
-  <script src="billing-math.js?v=33"></script>
-  <script src="billing-settlements.js?v=33"></script>
-  <script src="statistics-settlements.js?v=33"></script>
+  <script src="supabase.js?v=34"></script>
+  <script src="supabase-config.js?v=34"></script>
+  <script src="munkalap-data.js?v=34"></script>
+  <script src="app.js?v=34"></script>
+  <script src="billing-math.js?v=34"></script>
+  <script src="billing-settlements.js?v=34"></script>
+  <script src="statistics-settlements.js?v=34"></script>
 </body>
 </html>
