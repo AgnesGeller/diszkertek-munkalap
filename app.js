@@ -1,7 +1,7 @@
 const EMAIL_ENDPOINT = "https://formsubmit.co/ajax/info@diszkertek.hu";
 const EMAIL_RECIPIENT = "info@diszkertek.hu";
 const STABLE_APP_URL = "https://agnesgeller.github.io/diszkertek-munkalap/";
-const APP_VERSION = "39";
+const APP_VERSION = "40";
 const QUEUE_KEY = "diszkertek-munkalap-send-queue-v1";
 const MANAGER_VIEW_KEY = "diszkertek-munkalap-manager-view-v1";
 const DATABASE_FREE_LIMIT = 500 * 1024 * 1024;
@@ -1474,6 +1474,7 @@ async function openApp(profile) {
   $("#archiveReminder").hidden = !(now.getMonth() === 11 && now.getDate() >= 10);
   await loadWorksheets();
   await loadCustomers(profile.role === "manager", false);
+  if (profile.role === "manager") MunkalapDB.ensureRecurringCashExpenses().catch(() => {});
   handlingAppHistory = true;
   if (profile.role === "manager") setManagerView(initialManagerView, { skipHistory: true });
   history.replaceState({ munkalapApp: true, view: profile.role === "manager" ? initialManagerView : "worksheet", detail: "" }, "");

@@ -665,6 +665,17 @@
       return {cash_income:Number(data?.cash_income||0),cash_expense:Number(data?.cash_expense||0)};
     },
 
+    async ensureRecurringCashExpenses(month = null) {
+      if (previewMode) {
+        if (previewProfile?.role !== 'manager') throw new Error('Nincs jogosultság.');
+        return 0;
+      }
+      const parameters=month?{p_through_month:month}:{};
+      const {data,error}=await client.rpc('generate_recurring_cash_expenses',parameters);
+      if(error)throw error;
+      return Number(data||0);
+    },
+
     async saveBillingSettlement(settlement) {
       if (previewMode) {
         if (previewProfile?.role !== 'manager') throw new Error('Nincs jogosultság.');
