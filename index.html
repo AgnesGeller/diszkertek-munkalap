@@ -6,13 +6,13 @@
   <meta name="theme-color" content="#315f37">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Munkalap">
-  <link rel="manifest" href="manifest.webmanifest?v=37">
+  <link rel="manifest" href="manifest.webmanifest?v=38">
   <link rel="icon" href="munkalap-m-favicon-v12.ico" sizes="any">
   <link rel="icon" href="munkalap-m-icon-32-v12.png" type="image/png" sizes="32x32">
   <link rel="apple-touch-icon" href="munkalap-m-icon-apple-180-v12.png">
-  <link rel="stylesheet" href="styles.css?v=37">
-  <link rel="stylesheet" href="logo-overrides.css?v=37">
-  <link rel="stylesheet" href="app-shell.css?v=37">
+  <link rel="stylesheet" href="styles.css?v=38">
+  <link rel="stylesheet" href="logo-overrides.css?v=38">
+  <link rel="stylesheet" href="app-shell.css?v=38">
   <title>Díszkertek – Napi munkalap</title>
   <meta name="description" content="Díszkertek napi munkalapok és ügyfélnyilvántartás.">
   <meta property="og:title" content="Díszkertek – Napi munkalap">
@@ -197,7 +197,7 @@
       </div>
       <form id="budgetForm" class="budget-paper" hidden>
         <header class="budget-editor-head">
-          <button id="budgetBack" type="button">← Munkalapok</button>
+          <button id="budgetBack" type="button">← Kijelölés módosítása</button>
           <div><span>ELSZÁMOLÁS</span><h3 id="budgetHeading"></h3></div>
           <p class="budget-total"><small>Számított érték</small><strong id="budgetTotal"></strong></p>
         </header>
@@ -218,7 +218,7 @@
         <label>Állapot<select id="budgetState"><option value="draft">Piszkozat</option><option value="ready">Ellenőrizve</option><option value="sent">Elküldve</option><option value="paid">Kifizetve</option></select></label>
         <p id="budgetStateHelp" class="budget-state-help">Piszkozat: elmenthető, de még szerkesztés alatt áll.</p>
         <p id="budgetSaveStatus" class="budget-save-status" role="status" aria-live="polite"></p>
-        <button id="budgetSave" type="submit">Elszámolás mentése</button>
+        <div class="budget-edit-actions"><button id="budgetUndo" type="button" disabled>Módosítások visszavonása</button><button id="budgetSave" type="submit">Elszámolás mentése</button></div>
         <div id="budgetResultActions" class="budget-result-actions" hidden>
           <button id="budgetPrint" type="button">PDF mentése / nyomtatás</button>
           <button id="budgetEmail" type="button">E-mail megnyitása</button>
@@ -301,12 +301,12 @@
   </dialog>
   <dialog id="successDialog"><h2>Köszönöm, hogy beküldted a Munkalapot 😊</h2><p>Nagyon Cuki vagy ❤️</p><button id="newWorksheet" type="button">Új munkalap</button></dialog>
 
-  <script src="supabase.js?v=37"></script>
-  <script src="supabase-config.js?v=37"></script>
-  <script src="munkalap-data.js?v=37"></script>
-  <script src="app.js?v=37"></script>
-  <script src="billing-math.js?v=37"></script>
-  <script src="billing-settlements.js?v=37"></script>
-  <script src="statistics-settlements.js?v=37"></script>
+  <script src="supabase.js?v=38"></script>
+  <script src="supabase-config.js?v=38"></script>
+  <script src="munkalap-data.js?v=38"></script>
+  <script src="app.js?v=38"></script>
+  <script src="billing-math.js?v=38"></script>
+  <script src="billing-settlements.js?v=38"></script>
+  <script src="statistics-settlements.js?v=38"></script>
 </body>
 </html>

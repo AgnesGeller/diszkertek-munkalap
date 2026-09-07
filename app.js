@@ -1,7 +1,7 @@
 const EMAIL_ENDPOINT = "https://formsubmit.co/ajax/info@diszkertek.hu";
 const EMAIL_RECIPIENT = "info@diszkertek.hu";
 const STABLE_APP_URL = "https://agnesgeller.github.io/diszkertek-munkalap/";
-const APP_VERSION = "37";
+const APP_VERSION = "38";
 const QUEUE_KEY = "diszkertek-munkalap-send-queue-v1";
 const MANAGER_VIEW_KEY = "diszkertek-munkalap-manager-view-v1";
 const DATABASE_FREE_LIMIT = 500 * 1024 * 1024;
@@ -64,6 +64,15 @@ let customersLoaded = false;
 let customersLoading = false;
 let selectedCustomerId = null;
 let selectedLocationId = null;
+let handlingAppHistory = false;
+
+function pushAppHistory(view = managerView, detail = "") {
+  if (!session || handlingAppHistory) return;
+  const current = history.state;
+  if (current?.munkalapApp && current.view === view && current.detail === detail) return;
+  history.pushState({ munkalapApp: true, view, detail }, "");
+}
+window.pushAppHistory = pushAppHistory;
 
 function escapeHTML(value) {
   return String(value ?? "").replace(/[&<>'"]/g, character => ({
@@ -1118,7 +1127,8 @@ function fillFormFromWorksheet(item, returnView = "") {
   form.querySelector(".submit-button").textContent = "Módosítás mentése";
   $("#cancelEdit").hidden = false;
   $("#cancelEdit").textContent = returnView === "statistics" ? "Vissza a statisztikához" : returnView === "budget" ? "Vissza a költségvetéshez" : returnView === "office" ? "Vissza az irodához" : "Szerkesztés megszakítása";
-  setManagerView("worksheet");
+  setManagerView("worksheet", { skipHistory: true });
+  pushAppHistory("worksheet", "worksheet-edit");
   form.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
@@ -1183,9 +1193,10 @@ async function deleteWorksheet(id, button) {
   }
 }
 
-function setManagerView(view) {
+function setManagerView(view, options = {}) {
   if (session?.role !== "manager") return;
   if (managerView === "budget" && view !== "budget" && !window.Billing?.canLeave()) return;
+  const previousView = managerView;
   managerView = ["office", "customers", "worksheet", "budget", "statistics"].includes(view) ? view : "worksheet";
   officeViewActive = managerView === "office";
   localStorage.setItem(MANAGER_VIEW_KEY, managerView);
@@ -1199,6 +1210,7 @@ function setManagerView(view) {
   $("#customersTab").classList.toggle("active", managerView === "customers");
   $("#statisticsTab").classList.toggle("active", managerView === "statistics");
   $("#worksheetTab").classList.toggle("active", managerView === "worksheet");
+  if (!options.skipHistory && previousView !== managerView) pushAppHistory(managerView);
   if (officeViewActive) {
     if (officeWeekActive) applyOfficeWeek();
     renderOffice();
@@ -1462,7 +1474,10 @@ async function openApp(profile) {
   $("#archiveReminder").hidden = !(now.getMonth() === 11 && now.getDate() >= 10);
   await loadWorksheets();
   await loadCustomers(profile.role === "manager", false);
-  if (profile.role === "manager") setManagerView(initialManagerView);
+  handlingAppHistory = true;
+  if (profile.role === "manager") setManagerView(initialManagerView, { skipHistory: true });
+  history.replaceState({ munkalapApp: true, view: profile.role === "manager" ? initialManagerView : "worksheet", detail: "" }, "");
+  handlingAppHistory = false;
   updateQueueNotice();
   syncQueue();
   MunkalapDB.subscribe(() => {
@@ -1500,7 +1515,34 @@ async function logout() {
   $("#pinFieldWrap").hidden = !selectedProfile || rememberedOwnLogin;
   $("#enterButton").disabled = !selectedProfile;
   $("#loginStatus").textContent = "";
+  history.replaceState({ munkalapApp: true, view: "login", detail: "" }, "");
 }
+
+window.addEventListener("popstate", event => {
+  if (!session || !event.state?.munkalapApp) return;
+  handlingAppHistory = true;
+  let restoreCurrent = false;
+  try {
+    if (window.Billing?.isEditing?.()) {
+      restoreCurrent = window.Billing.back(true) === false;
+      return;
+    }
+    if (editingId) {
+      if (formDirty && !confirm("A munkalapon nem mentett módosítások vannak. Biztosan visszalépsz?")) {
+        restoreCurrent = true;
+        return;
+      }
+      const target = worksheetReturnView || event.state.view || "worksheet";
+      resetForm();
+      if (session.role === "manager") setManagerView(target, { skipHistory: true });
+      return;
+    }
+    if (session.role === "manager") setManagerView(event.state.view || "worksheet", { skipHistory: true });
+  } finally {
+    handlingAppHistory = false;
+    if (restoreCurrent) setTimeout(() => pushAppHistory(managerView, window.Billing?.isEditing?.() ? "settlement" : editingId ? "worksheet-edit" : ""), 0);
+  }
+});
 
 $("#logoutButton").addEventListener("click", logout);
 $("#reloadHistory").addEventListener("click", async () => {
