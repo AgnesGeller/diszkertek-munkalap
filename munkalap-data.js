@@ -648,18 +648,20 @@
       if (previewMode) {
         if (previewProfile?.role !== 'manager') throw new Error('Nincs jogosultság.');
         const subtotal=BillingMath.total(settlement.items),discount=settlement.discount_type==='percent'?subtotal*Number(settlement.discount_value||0)/100:settlement.discount_type==='amount'?Number(settlement.discount_value||0):0;
-        const row={...structuredClone(settlement),id:settlement.id||crypto.randomUUID(),subtotal,total:Math.max(0,subtotal-discount),updated_at:new Date().toISOString()};previewSettlements.set(row.id,row);return structuredClone(row);
+        const worksheetIds=[...new Set(settlement.worksheet_ids)],row={...structuredClone(settlement),worksheet_ids:worksheetIds,id:settlement.id||crypto.randomUUID(),subtotal,total:Math.max(0,subtotal-discount),updated_at:new Date().toISOString()};
+        for(const [id,existing] of previewSettlements){if(id===row.id||!existing.worksheet_ids?.some(worksheetId=>worksheetIds.includes(worksheetId)))continue;if(!existing.worksheet_ids.every(worksheetId=>worksheetIds.includes(worksheetId)))throw new Error('Egy korábbi elszámolás teljes munkalapcsoportját ki kell jelölni az összevonáshoz.');previewSettlements.delete(id);}
+        previewSettlements.set(row.id,row);return structuredClone(row);
       }
-      const payload={customer_id:settlement.customer_id||null,customer_name:settlement.customer_name,period_start:settlement.period_start,period_end:settlement.period_end,source_snapshots:settlement.source_snapshots,items:settlement.items,notes:settlement.notes,status:settlement.status,discount_type:settlement.discount_type,discount_value:settlement.discount_value};
-      if(settlement.id){
-        const {data,error}=await client.from('billing_settlements').update(payload).eq('id',settlement.id).eq('updated_at',settlement.updated_at).select('*').maybeSingle();
-        if(error)throw error;if(!data)throw new Error('Az elszámolást közben más módosította. Nyisd meg újra.');return {...data,worksheet_ids:settlement.worksheet_ids};
-      }
-      const {data,error}=await client.from('billing_settlements').insert(payload).select('*').single();if(error)throw error;
-      const links=settlement.worksheet_ids.map(worksheet_id=>({settlement_id:data.id,worksheet_id}));
-      const {error:linkError}=await client.from('billing_settlement_worksheets').insert(links);
-      if(linkError){await client.from('billing_settlements').delete().eq('id',data.id);if(linkError.code==='23505')throw new Error('A kiválasztott munkalapok valamelyike már egy másik elszámolásban szerepel.');throw linkError;}
-      return {...data,worksheet_ids:settlement.worksheet_ids};
+      const {data,error}=await client.rpc('save_billing_settlement',{
+        p_settlement_id:settlement.id||null,p_expected_updated_at:settlement.updated_at||null,
+        p_customer_id:settlement.customer_id||null,p_customer_name:settlement.customer_name,
+        p_period_start:settlement.period_start,p_period_end:settlement.period_end,
+        p_source_snapshots:settlement.source_snapshots,p_items:settlement.items,
+        p_notes:settlement.notes,p_status:settlement.status,p_discount_type:settlement.discount_type,
+        p_discount_value:settlement.discount_value,p_worksheet_ids:[...new Set(settlement.worksheet_ids)]
+      });
+      if(error)throw error;
+      return data;
     },
 
     async databaseSize() {
