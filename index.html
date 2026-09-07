@@ -6,13 +6,13 @@
   <meta name="theme-color" content="#315f37">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Munkalap">
-  <link rel="manifest" href="manifest.webmanifest?v=38">
+  <link rel="manifest" href="manifest.webmanifest?v=39">
   <link rel="icon" href="munkalap-m-favicon-v12.ico" sizes="any">
   <link rel="icon" href="munkalap-m-icon-32-v12.png" type="image/png" sizes="32x32">
   <link rel="apple-touch-icon" href="munkalap-m-icon-apple-180-v12.png">
-  <link rel="stylesheet" href="styles.css?v=38">
-  <link rel="stylesheet" href="logo-overrides.css?v=38">
-  <link rel="stylesheet" href="app-shell.css?v=38">
+  <link rel="stylesheet" href="styles.css?v=39">
+  <link rel="stylesheet" href="logo-overrides.css?v=39">
+  <link rel="stylesheet" href="app-shell.css?v=39">
   <title>Díszkertek – Napi munkalap</title>
   <meta name="description" content="Díszkertek napi munkalapok és ügyfélnyilvántartás.">
   <meta property="og:title" content="Díszkertek – Napi munkalap">
@@ -254,7 +254,18 @@
         <div><span>Még nem kifizetett</span><b id="statisticsOutstanding">0 Ft</b></div>
         <div><span>Kifizetett</span><b id="statisticsPaid">0 Ft</b></div>
       </section>
+      <section class="financial-summary" aria-label="Bevétel és kiadás">
+        <p class="financial-summary-title">A teljes kiválasztott időszak pénzügyi képe</p>
+        <div><span>Munkalap szerinti bevétel</span><b id="statisticsWorkIncome">0 Ft</b></div>
+        <div><span>Kasszában rögzített bevétel</span><b id="statisticsCashIncome">0 Ft</b></div>
+        <div><span>Kassza kiadás</span><b id="statisticsCashExpense">0 Ft</b></div>
+        <div><span>Várható eredmény</span><b id="statisticsExpectedResult">0 Ft</b></div>
+      </section>
       <div class="statistics-table-wrap"><table class="statistics-table"><thead><tr><th>Dátum</th><th>Ügyfél</th><th>Helyszín</th><th>Csoportvezető</th><th>Számított érték</th><th>Elszámolás</th><th>Megnyitás</th></tr></thead><tbody id="statisticsRows"></tbody></table></div>
+      <section id="statisticsFlatSection" class="statistics-flat" hidden>
+        <h3>Havi átalányok</h3>
+        <div class="statistics-table-wrap"><table class="statistics-table"><thead><tr><th>Hónap</th><th>Ügyfél</th><th>Átalány</th><th>Elvégzett munka értéke</th><th>Különbség</th><th>Megnyitás</th></tr></thead><tbody id="statisticsFlatRows"></tbody></table></div>
+      </section>
     </section>
 
     <footer class="company-footer">
@@ -301,12 +312,12 @@
   </dialog>
   <dialog id="successDialog"><h2>Köszönöm, hogy beküldted a Munkalapot 😊</h2><p>Nagyon Cuki vagy ❤️</p><button id="newWorksheet" type="button">Új munkalap</button></dialog>
 
-  <script src="supabase.js?v=38"></script>
-  <script src="supabase-config.js?v=38"></script>
-  <script src="munkalap-data.js?v=38"></script>
-  <script src="app.js?v=38"></script>
-  <script src="billing-math.js?v=38"></script>
-  <script src="billing-settlements.js?v=38"></script>
-  <script src="statistics-settlements.js?v=38"></script>
+  <script src="supabase.js?v=39"></script>
+  <script src="supabase-config.js?v=39"></script>
+  <script src="munkalap-data.js?v=39"></script>
+  <script src="app.js?v=39"></script>
+  <script src="billing-math.js?v=39"></script>
+  <script src="billing-settlements.js?v=39"></script>
+  <script src="statistics-settlements.js?v=39"></script>
 </body>
 </html>

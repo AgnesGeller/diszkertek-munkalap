@@ -644,6 +644,27 @@
       return rows.map(row=>({...row,worksheet_ids:bySettlement.get(row.id)||[]}));
     },
 
+    async ensureMonthlyFlatSettlements(month = null) {
+      if (previewMode) {
+        if (previewProfile?.role !== 'manager') throw new Error('Nincs jogosultság.');
+        return 0;
+      }
+      const parameters=month?{p_month:month}:{};
+      const {data,error}=await client.rpc('generate_monthly_flat_settlements',parameters);
+      if(error)throw error;
+      return Number(data||0);
+    },
+
+    async financialSummary(from,to) {
+      if (previewMode) {
+        if (previewProfile?.role !== 'manager') throw new Error('Nincs jogosultság.');
+        return {cash_income:0,cash_expense:0};
+      }
+      const {data,error}=await client.rpc('financial_summary',{p_from:from,p_to:to});
+      if(error)throw error;
+      return {cash_income:Number(data?.cash_income||0),cash_expense:Number(data?.cash_expense||0)};
+    },
+
     async saveBillingSettlement(settlement) {
       if (previewMode) {
         if (previewProfile?.role !== 'manager') throw new Error('Nincs jogosultság.');

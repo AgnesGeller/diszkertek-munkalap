@@ -7,7 +7,8 @@ Telefonra telepíthető PWA a Canva munkalap mezői alapján.
 - Önálló helyi és GitHub-projekt: `AgnesGeller/diszkertek-munkalap`.
 - A Supabase `Kassza` projekt technikai hátterét használja.
 - Kizárólag a `munkalap` és `munkalap_private` adatbázissémákhoz tartozik.
-- A Kassza alkalmazás `public` tábláit nem olvassa és nem módosítja.
+- A Kassza adataiból kizárólag Ági és Tamás számára készít időszaki bevétel–kiadás
+  összesítést. A Kassza tábláit és a dolgozói Kassza-felületet nem módosítja.
 
 Az adatbázis biztonságos beállítása: [`supabase/README.md`](supabase/README.md).
 
@@ -32,7 +33,8 @@ levelezőalkalmazásával is elküldhető a már előkészített levél.
 
 A dolgozók csak a saját legutóbbi 10 munkalapjukat látják és szerkesztik. Ági
 és Tamás az IRODA nézetben minden munkalapot szűrhet, szerkeszthet, Excelbe
-menthet vagy PDF-ként nyomtathat.
+menthet vagy PDF-ként nyomtathat. Az ügyfélárak, elszámolások, havi átalányok
+és pénzügyi statisztikák kizárólag az irodai vezetői felületen érhetők el.
 
 Az alkalmazás újranyitáskor nem tölti vissza az előző munkalap kitöltött
 mezőit. Minden mező üres, csak az aktuális dátum jelenik meg. A böngésző saját
