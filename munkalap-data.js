@@ -441,7 +441,7 @@
         if (manager) {
           const detailsResult = await client
             .from("customer_details")
-            .select("customer_id,customer_type,contact_name,email,phone,tax_number,billing_mode,monthly_flat_fee,notes")
+            .select("customer_id,customer_type,contact_name,email,phone,tax_number,billing_mode,monthly_flat_fee,flat_fee_start_month,notes")
             .in("customer_id", ids);
           if (detailsResult.error) throw detailsResult.error;
           detailRows = detailsResult.data || [];
@@ -464,6 +464,7 @@
           taxNumber: detail.tax_number || "",
           billingMode: detail.billing_mode || "per_job",
           monthlyFlatFee: detail.monthly_flat_fee == null ? null : Number(detail.monthly_flat_fee),
+          flatFeeStartMonth: detail.flat_fee_start_month || null,
           notes: detail.notes || "",
           locations: locationRows.filter(location => location.customer_id === row.id).map(location => ({
             id: location.id,
