@@ -1,7 +1,7 @@
 const EMAIL_ENDPOINT = "https://formsubmit.co/ajax/info@diszkertek.hu";
 const EMAIL_RECIPIENT = "info@diszkertek.hu";
 const STABLE_APP_URL = "https://agnesgeller.github.io/diszkertek-munkalap/";
-const APP_VERSION = "40";
+const APP_VERSION = "41";
 const QUEUE_KEY = "diszkertek-munkalap-send-queue-v1";
 const MANAGER_VIEW_KEY = "diszkertek-munkalap-manager-view-v1";
 const DATABASE_FREE_LIMIT = 500 * 1024 * 1024;
@@ -703,7 +703,7 @@ function worksheetCardHTML(item, office = false) {
         ${item.pending ? (canManagePending ? `<button class="delete-button" type="button" data-cancel-queue="${escapeHTML(item.pendingQueueId)}">Várakozó példány törlése</button>` : "") : `<button type="button" data-edit="${escapeHTML(item.id)}">Megnyitás / Szerkesztés</button>`}
         ${office ? `<button type="button" data-print="${escapeHTML(item.id)}">PDF / Nyomtatás</button>` : ""}
         ${office && !item.pending ? `<button class="budget-tab" type="button" data-budget="${escapeHTML(item.id)}">Elszámolás</button>` : ""}
-        ${office && !item.pending ? `<button class="delete-button" type="button" data-delete="${escapeHTML(item.id)}">Törlés</button>` : ""}
+        ${(office || session?.role === "manager") && !item.pending ? `<button class="delete-button" type="button" data-delete="${escapeHTML(item.id)}">Munkalap törlése</button>` : ""}
       </div>
     </article>`;
 }
@@ -1140,8 +1140,10 @@ window.openWorksheetForEdit = openWorksheetForEdit;
 
 $("#recentWorksheets").addEventListener("click", event => {
   const button = event.target.closest("[data-edit]");
+  const remove = event.target.closest("[data-delete]");
   const cancelQueue = event.target.closest("[data-cancel-queue]");
   if (button) openWorksheetForEdit(button.dataset.edit);
+  if (remove) deleteWorksheet(remove.dataset.delete, remove);
   if (cancelQueue) cancelQueuedWorksheet(cancelQueue.dataset.cancelQueue);
 });
 
@@ -1179,17 +1181,24 @@ async function deleteWorksheet(id, button) {
   if (!confirm(`VÉGLEGES TÖRLÉS\n\n${label}\n\nA törlés nem vonható vissza. Folytatod?`)) return;
   button.disabled = true;
   button.textContent = "Törlés…";
-  showOfficeStatus("A munkalap törlése folyamatban…");
+  if (officeViewActive) showOfficeStatus("A munkalap törlése folyamatban…");
+  else showStatus("A munkalap törlése folyamatban…");
   try {
-    await MunkalapDB.remove(id);
+    const result = await MunkalapDB.remove(id);
     worksheets = worksheets.filter(worksheet => worksheet.id !== id);
     renderAll();
-    showOfficeStatus("A munkalapot véglegesen töröltük.", "success");
+    const message = result?.settlement_adjusted
+      ? "A munkalapot végleg töröltük. A közös elszámolás megmaradt, a törölt munkalap tételei kikerültek belőle, és újra Piszkozat állapotba került."
+      : "A munkalapot és a hozzá tartozó önálló elszámolást véglegesen töröltük.";
+    if (officeViewActive) showOfficeStatus(message, "success");
+    else showStatus(message, "success");
     loadDatabaseUsage();
   } catch (error) {
     button.disabled = false;
     button.textContent = "Törlés";
-    showOfficeStatus(error?.code === "23503" ? "Ehhez a munkalaphoz elszámolás vagy más kapcsolódó adat tartozik, ezért nem törölhető." : `A törlés nem sikerült: ${error?.message || "ismeretlen hiba"}.`, "error");
+    const message = `A törlés nem sikerült: ${error?.message || "ismeretlen hiba"}.`;
+    if (officeViewActive) showOfficeStatus(message, "error");
+    else showStatus(message, "error");
   }
 }
 

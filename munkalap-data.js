@@ -544,17 +544,25 @@
         if (previewProfile?.role !== "manager") throw new Error("Nincs jogosultság.");
         const index = previewWorksheets.findIndex(record => record.id === id);
         if (index < 0) throw new Error("A munkalap nem található.");
+        for (const [settlementId, settlement] of previewSettlements) {
+          if (!settlement.worksheet_ids?.includes(id)) continue;
+          if (settlement.worksheet_ids.length === 1) previewSettlements.delete(settlementId);
+          else {
+            settlement.worksheet_ids = settlement.worksheet_ids.filter(worksheetId => worksheetId !== id);
+            settlement.source_snapshots = settlement.source_snapshots.filter(source => source.worksheetId !== id);
+            settlement.items = settlement.items.filter(item => item.sourceWorksheetId !== id);
+            settlement.status = "draft";
+          }
+        }
+        previewBilling.delete(id);
         previewWorksheets.splice(index, 1);
         return id;
       }
-      const { data, error } = await client
-        .from("worksheets")
-        .delete()
-        .eq("id", id)
-        .select("id")
-        .single();
+      const { data, error } = await client.rpc("delete_worksheet_as_manager", {
+        p_worksheet_id: id
+      });
       if (error) throw error;
-      return data.id;
+      return data || { id };
     },
 
     async billingPrices() {
