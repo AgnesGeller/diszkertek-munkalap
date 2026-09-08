@@ -37,4 +37,38 @@ drop function if exists munkalap.list_recurring_cash_expenses();
 drop function if exists munkalap.save_recurring_cash_expense(text,timestamptz,text,text,text,bigint,date,date,boolean);
 drop function if exists munkalap.delete_recurring_cash_expense(text);
 
+-- A Kassza havi-fix kezelőpontjai is megszűnnek; más Kassza-funkciót nem érint.
+drop function if exists public.delete_recurring_cash_expense(text);
+drop function if exists public.generate_recurring_cash_expenses_for_cash();
+drop function if exists public.list_recurring_cash_expenses();
+drop function if exists public.save_recurring_cash_expense(text,text,text,text,bigint,date,boolean);
+drop function if exists munkalap_private.generate_recurring_cash_expenses_internal(date);
+
+-- A közös Kassza-védelem továbbra is védi a munkalap-elszámolásból létrejött bevételeket.
+create or replace function munkalap_private.protect_linked_cash_entry()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if (
+    current_setting('munkalap.cash_sync', true) is distinct from 'on'
+    and (
+      (tg_op <> 'INSERT' and old.source_type = 'munkalap_settlement')
+      or (tg_op <> 'DELETE' and new.source_type = 'munkalap_settlement')
+    )
+  ) then
+    raise exception using
+      errcode = '42501',
+      message = 'Ezt a Kassza-tételt az automatikus kapcsolat kezeli. A módosítást a Munkalap elszámolásánál végezd.';
+  end if;
+  if tg_op = 'DELETE' then return old; end if;
+  return new;
+end;
+$$;
+
+drop table if exists munkalap_private.recurring_cash_expense_entries;
+drop table if exists munkalap_private.recurring_cash_expenses;
+
 commit;
