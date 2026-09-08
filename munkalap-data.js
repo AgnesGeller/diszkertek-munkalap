@@ -441,7 +441,7 @@
         if (manager) {
           const detailsResult = await client
             .from("customer_details")
-            .select("customer_id,customer_type,contact_name,email,phone,tax_number,billing_mode,monthly_flat_fee,flat_fee_start_month,notes")
+            .select("customer_id,customer_type,contact_name,email,phone,tax_number,billing_mode,notes")
             .in("customer_id", ids);
           if (detailsResult.error) throw detailsResult.error;
           detailRows = detailsResult.data || [];
@@ -462,9 +462,7 @@
           email: detail.email || "",
           phone: detail.phone || "",
           taxNumber: detail.tax_number || "",
-          billingMode: detail.billing_mode || "per_job",
-          monthlyFlatFee: detail.monthly_flat_fee == null ? null : Number(detail.monthly_flat_fee),
-          flatFeeStartMonth: detail.flat_fee_start_month || null,
+          billingMode: detail.billing_mode === "flat_monthly" ? "monthly_grouped" : (detail.billing_mode || "per_job"),
           notes: detail.notes || "",
           locations: locationRows.filter(location => location.customer_id === row.id).map(location => ({
             id: location.id,
@@ -503,7 +501,6 @@
         saved_phone: customer.phone || "",
         saved_tax_number: customer.taxNumber || "",
         saved_billing_mode: customer.billingMode || "per_job",
-        saved_monthly_flat_fee: customer.monthlyFlatFee == null || customer.monthlyFlatFee === "" ? null : Number(customer.monthlyFlatFee),
         saved_notes: customer.notes || "",
         saved_locations: customer.locations || [],
         removed_location_ids: customer.removedLocationIds || []

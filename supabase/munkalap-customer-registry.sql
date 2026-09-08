@@ -43,8 +43,7 @@ create table if not exists munkalap.customer_details (
   phone text,
   tax_number text,
   billing_mode text not null default 'per_job'
-    check (billing_mode in ('flat_monthly', 'monthly_grouped', 'per_job', 'manual')),
-  monthly_flat_fee numeric(14,2) check (monthly_flat_fee is null or monthly_flat_fee >= 0),
+    check (billing_mode in ('monthly_grouped', 'per_job', 'manual')),
   notes text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -239,7 +238,6 @@ create or replace function munkalap.save_customer(
   saved_phone text,
   saved_tax_number text,
   saved_billing_mode text,
-  saved_monthly_flat_fee numeric,
   saved_notes text,
   saved_locations jsonb,
   removed_location_ids uuid[] default '{}'::uuid[]
@@ -279,11 +277,11 @@ begin
 
   insert into munkalap.customer_details (
     customer_id, customer_type, contact_name, email, phone, tax_number,
-    billing_mode, monthly_flat_fee, notes
+    billing_mode, notes
   ) values (
     result_id, nullif(btrim(saved_customer_type), ''), nullif(btrim(saved_contact_name), ''),
     nullif(btrim(saved_email), ''), nullif(btrim(saved_phone), ''),
-    nullif(btrim(saved_tax_number), ''), saved_billing_mode, saved_monthly_flat_fee,
+    nullif(btrim(saved_tax_number), ''), saved_billing_mode,
     nullif(btrim(saved_notes), '')
   )
   on conflict (customer_id) do update set
@@ -293,7 +291,6 @@ begin
     phone = excluded.phone,
     tax_number = excluded.tax_number,
     billing_mode = excluded.billing_mode,
-    monthly_flat_fee = excluded.monthly_flat_fee,
     notes = excluded.notes;
 
   for location_record in select value from jsonb_array_elements(coalesce(saved_locations, '[]'::jsonb))
@@ -331,8 +328,8 @@ begin
 end
 $$;
 
-revoke all on function munkalap.save_customer(uuid, text, boolean, text, text, text, text, text, text, text, numeric, text, jsonb, uuid[]) from public, anon;
-grant execute on function munkalap.save_customer(uuid, text, boolean, text, text, text, text, text, text, text, numeric, text, jsonb, uuid[])
+revoke all on function munkalap.save_customer(uuid, text, boolean, text, text, text, text, text, text, text, text, jsonb, uuid[]) from public, anon;
+grant execute on function munkalap.save_customer(uuid, text, boolean, text, text, text, text, text, text, text, text, jsonb, uuid[])
   to authenticated, service_role;
 
 -- A régi munkalapokon szereplő ügyfelek nem vesznek el. Ellenőrzésre váróként

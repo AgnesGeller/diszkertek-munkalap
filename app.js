@@ -1,7 +1,7 @@
 const EMAIL_ENDPOINT = "https://formsubmit.co/ajax/info@diszkertek.hu";
 const EMAIL_RECIPIENT = "info@diszkertek.hu";
 const STABLE_APP_URL = "https://agnesgeller.github.io/diszkertek-munkalap/";
-const APP_VERSION = "46";
+const APP_VERSION = "47";
 const QUEUE_KEY = "diszkertek-munkalap-send-queue-v1";
 const MANAGER_VIEW_KEY = "diszkertek-munkalap-manager-view-v1";
 const DATABASE_FREE_LIMIT = 500 * 1024 * 1024;
@@ -966,7 +966,7 @@ function openCustomerDialog(customer = null) {
   customerForm.elements.email.value = customer?.email || "";
   customerForm.elements.phone.value = customer?.phone || "";
   customerForm.elements.taxNumber.value = customer?.taxNumber || "";
-  customerForm.elements.billingMode.value = customer?.billingMode === "flat_monthly" ? "monthly_grouped" : (customer?.billingMode || "per_job");
+  customerForm.elements.billingMode.value = customer?.billingMode || "per_job";
   customerForm.elements.locations.value = (customer?.locations || []).filter(location => location.active !== false).map(location => location.address).join("\n");
   customerForm.elements.notes.value = customer?.notes || "";
   customerForm.elements.approved.checked = customer?.reviewStatus === "approved";
@@ -1024,7 +1024,6 @@ $("#customerForm").addEventListener("submit", async event => {
     phone: customerForm.elements.phone.value.trim(),
     taxNumber: customerForm.elements.taxNumber.value.trim(),
     billingMode: customerForm.elements.billingMode.value,
-    monthlyFlatFee: null,
     notes: customerForm.elements.notes.value.trim(),
     reviewStatus: customerForm.elements.approved.checked ? "approved" : "pending",
     active: customerForm.elements.active.checked,
