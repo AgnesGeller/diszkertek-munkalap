@@ -181,7 +181,11 @@ begin
     ), 0),
     'cash_expense', coalesce(sum(entry.amount) filter (
       where entry.direction = 'expense'
-        and coalesce(entry.category, '') <> 'Pénzátadás – munkatársnak'
+        and btrim(coalesce(entry.category, '')) in (
+          'Működési költség',
+          'Ügyfélkiadás',
+          'Egyéb kiadás'
+        )
     ), 0)
   ) into result
   from public.entries entry
