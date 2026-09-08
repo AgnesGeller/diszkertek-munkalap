@@ -33,8 +33,8 @@ levelezőalkalmazásával is elküldhető a már előkészített levél.
 
 A dolgozók csak a saját legutóbbi 10 munkalapjukat látják és szerkesztik. Ági
 és Tamás az IRODA nézetben minden munkalapot szűrhet, szerkeszthet, Excelbe
-menthet vagy PDF-ként nyomtathat. Az ügyfélárak, elszámolások, havi átalányok
-és pénzügyi statisztikák kizárólag az irodai vezetői felületen érhetők el.
+menthet vagy PDF-ként nyomtathat. Az ügyfélárak, elszámolások és pénzügyi
+statisztikák kizárólag az irodai vezetői felületen érhetők el.
 
 Az alkalmazás újranyitáskor nem tölti vissza az előző munkalap kitöltött
 mezőit. Minden mező üres, csak az aktuális dátum jelenik meg. A böngésző saját

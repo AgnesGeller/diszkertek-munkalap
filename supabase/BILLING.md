@@ -8,7 +8,7 @@
 - Az optimista zárolás megakadályozza, hogy két irodai mentés észrevétlenül felülírja egymást.
 - A munkaidő személypercben tárolódik: létszám × (távozás − érkezés). Az óradíjhoz 60-as osztó tartozik. Hibás/éjszakába nyúló időszak kézi ellenőrzésre vár; nem feltételezünk másnapi távozást.
 - A végösszeget az adatbázis újraszámolja, két tizedesre kerekítve. Nincs áfa-hozzáadás. A böngésző egész számú részösszegekkel számol, csak a végén kerekít.
-- Átalányos ügyfeleknél is teljes óradíjas érték készül. A havi átalány külön összehasonlító adat, nem adódik hozzá automatikusan és nem ismétlődik helyszínenként.
+- A bevétel minden esetben a munkalapokból és a hozzájuk mentett elszámolásokból készül.
 - Állapotok: Piszkozat, Ellenőrizve, Elküldve, Kifizetve. PDF és előre kitöltött e-mail csak mentett, nem piszkozat állapotból készülhet.
 - A statisztika dátum, ügyfél, helyszín és állapot szerint szűrhető. A dolgozói felület árakat, elszámolást és statisztikát nem kap.
 

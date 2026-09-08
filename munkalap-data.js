@@ -30,12 +30,6 @@
   let previewWorksheets = [];
   let previewCustomers = [];
   let previewPrices = [{code:'labor',label:'Munkadíj',unit:'Ft / fő / óra',unit_price:1,confirmed:false,updated_at:'preview'}];
-  let previewRecurringExpenses = [
-    {code:'rent',designation:'Bérleti díj',category:'Működési költség',note:'',amount:500000,start_month:'2026-08-01',end_month:null,active:true,updated_at:'preview'},
-    {code:'zsolti_costs',designation:'Költségek Zsolti felé',category:'Működési költség',note:'',amount:400000,start_month:'2026-08-01',end_month:null,active:true,updated_at:'preview'},
-    {code:'edina_office',designation:'Költségeim Edina felé',category:'Működési költség',note:'Irodai költségek',amount:290000,start_month:'2026-08-01',end_month:null,active:true,updated_at:'preview'},
-    {code:'chatgpt_twice',designation:'Chat GPT 2x',category:'Működési költség',note:'Irodai kiadás',amount:20000,start_month:'2026-08-01',end_month:null,active:true,updated_at:'preview'}
-  ];
   const previewBilling = new Map();
   const previewSettlements = new Map();
 
@@ -661,17 +655,6 @@
       return rows.map(row=>({...row,worksheet_ids:bySettlement.get(row.id)||[],cash_entry:cashBySettlement.get(row.id)||null}));
     },
 
-    async ensureMonthlyFlatSettlements(month = null) {
-      if (previewMode) {
-        if (previewProfile?.role !== 'manager') throw new Error('Nincs jogosultság.');
-        return 0;
-      }
-      const parameters=month?{p_month:month}:{};
-      const {data,error}=await client.rpc('generate_monthly_flat_settlements',parameters);
-      if(error)throw error;
-      return Number(data||0);
-    },
-
     async financialSummary(from,to) {
       if (previewMode) {
         if (previewProfile?.role !== 'manager') throw new Error('Nincs jogosultság.');
@@ -680,57 +663,6 @@
       const {data,error}=await client.rpc('financial_summary',{p_from:from,p_to:to});
       if(error)throw error;
       return {cash_income:Number(data?.cash_income||0),cash_expense:Number(data?.cash_expense||0)};
-    },
-
-    async recurringCashExpenses() {
-      if (previewMode) {
-        if (previewProfile?.role !== 'manager') throw new Error('Nincs jogosultság.');
-        return structuredClone(previewRecurringExpenses);
-      }
-      const {data,error}=await client.rpc('list_recurring_cash_expenses');
-      if(error)throw error;
-      return data||[];
-    },
-
-    async saveRecurringCashExpense(expense) {
-      if (previewMode) {
-        if (previewProfile?.role !== 'manager') throw new Error('Nincs jogosultság.');
-        const row={...structuredClone(expense),code:expense.code||`custom_${crypto.randomUUID().replaceAll('-','_')}`,updated_at:new Date().toISOString()};
-        const index=previewRecurringExpenses.findIndex(item=>item.code===row.code);
-        if(index<0)previewRecurringExpenses.push(row);else previewRecurringExpenses[index]=row;
-        return structuredClone(row);
-      }
-      const {data,error}=await client.rpc('save_recurring_cash_expense',{
-        p_code:expense.code||null,p_expected_updated_at:expense.updated_at||null,
-        p_designation:expense.designation,p_category:expense.category,p_note:expense.note||'',
-        p_amount:expense.amount,p_start_month:expense.start_month,p_end_month:expense.end_month||null,
-        p_active:expense.active!==false
-      });
-      if(error)throw error;
-      return data;
-    },
-
-    async deleteRecurringCashExpense(code) {
-      if (previewMode) {
-        if (previewProfile?.role !== 'manager') throw new Error('Nincs jogosultság.');
-        const before=previewRecurringExpenses.length;
-        previewRecurringExpenses=previewRecurringExpenses.filter(item=>item.code!==code);
-        return previewRecurringExpenses.length<before;
-      }
-      const {data,error}=await client.rpc('delete_recurring_cash_expense',{p_code:code});
-      if(error)throw error;
-      return Boolean(data);
-    },
-
-    async ensureRecurringCashExpenses(month = null) {
-      if (previewMode) {
-        if (previewProfile?.role !== 'manager') throw new Error('Nincs jogosultság.');
-        return 0;
-      }
-      const parameters=month?{p_through_month:month}:{};
-      const {data,error}=await client.rpc('generate_recurring_cash_expenses',parameters);
-      if(error)throw error;
-      return Number(data||0);
     },
 
     async saveBillingSettlement(settlement) {

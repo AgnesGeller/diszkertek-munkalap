@@ -14,8 +14,6 @@ assert.throws(()=>math.total([{quantity:'1',unitPrice:'2',divisor:0}]));
 items=math.build({data:{team_1_size:'2',team_1_arrival:'16:00',team_1_departure:'08:00',maintenance_0:'1,5'}},prices);
 assert.equal(items[0].reviewed,false);assert.equal(items[0].quantity,'0');assert.equal(items[1].reviewed,false);
 assert.equal(math.minutes('25:00'),null);assert.equal(math.minutes('08:60'),null);
-items=math.build({data:{team_1_size:'4',team_1_arrival:'08:00',team_1_departure:'16:00'},billingMode:'flat_monthly'},prices);
-assert.equal(math.total(items),384000,'Flat customers retain hourly valuation');
 const earthPrices=[...prices,{code:'construction_3',label:'Föld elszállítása',unit:'m³',unit_price:123,confirmed:true},{code:'extra_earth_freight',label:'Fuvardíj',unit:'fuvar',unit_price:456,confirmed:true}];
 items=math.build({data:{construction_3:'2,5'}},earthPrices);
 assert.equal(items.length,2);assert.equal(math.total(items),763.5);assert.equal(items[1].reviewed,false,'Freight quantity needs office confirmation');
@@ -23,4 +21,4 @@ for(const value of ['', '0', '-1', 'hibás'])assert.equal(math.build({data:{cons
 assert.equal(math.build({data:{}},earthPrices).length,0,'Catalog extras are not automatically charged');
 items=math.build({data:{team_1_size:'1',team_1_arrival:'08:00',team_1_departure:'09:00',maintenance_0:'2'}},prices.map(p=>p.code==='maintenance_0'?{...p,active:false}:p));
 assert.equal(items[1].unitPrice,'0');assert.equal(items[1].reviewed,false);assert.ok(items[1].label.includes('kézi árazás'));
-console.log('PASS: person-minutes, multiple teams, decimal units, rounding, invalid inputs, provisional prices, flat-rate valuation and separate earth freight.');
+console.log('PASS: person-minutes, multiple teams, decimal units, rounding, invalid inputs, provisional prices, and separate earth freight.');
