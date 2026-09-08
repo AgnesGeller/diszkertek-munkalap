@@ -6,13 +6,13 @@
   <meta name="theme-color" content="#315f37">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Munkalap">
-  <link rel="manifest" href="manifest.webmanifest?v=45">
+  <link rel="manifest" href="manifest.webmanifest?v=46">
   <link rel="icon" href="munkalap-m-favicon-v12.ico" sizes="any">
   <link rel="icon" href="munkalap-m-icon-32-v12.png" type="image/png" sizes="32x32">
   <link rel="apple-touch-icon" href="munkalap-m-icon-apple-180-v12.png">
-  <link rel="stylesheet" href="styles.css?v=45">
-  <link rel="stylesheet" href="logo-overrides.css?v=45">
-  <link rel="stylesheet" href="app-shell.css?v=45">
+  <link rel="stylesheet" href="styles.css?v=46">
+  <link rel="stylesheet" href="logo-overrides.css?v=46">
+  <link rel="stylesheet" href="app-shell.css?v=46">
   <title>Díszkertek – Napi munkalap</title>
   <meta name="description" content="Díszkertek napi munkalapok és ügyfélnyilvántartás.">
   <meta property="og:title" content="Díszkertek – Napi munkalap">
@@ -64,7 +64,7 @@
     <nav id="managerTabs" class="manager-tabs" hidden aria-label="Irodai nézet vagy napi munkalap">
       <button id="officeTab" type="button">IRODA</button>
       <button id="customersTab" type="button">ÜGYFELEK</button>
-      <button id="budgetTab" class="budget-tab" type="button">KÖLTSÉGVETÉS</button>
+      <button id="budgetTab" class="budget-tab" type="button">ELSZÁMOLÁSOK</button>
       <button id="statisticsTab" class="statistics-tab" type="button">STATISZTIKA</button>
       <button id="worksheetTab" type="button">NAPI MUNKALAP</button>
     </nav>
@@ -174,15 +174,15 @@
     </section>
 
     <section id="budgetView" class="budget-view" hidden>
-      <h2>Költségvetés</h2>
-      <nav class="budget-mode-tabs" aria-label="Költségvetés nézete">
+      <h2>Elszámolások</h2>
+      <nav class="budget-mode-tabs" aria-label="Elszámolások nézete">
         <button id="budgetSettlementsTab" class="active" type="button">Elszámolások</button>
         <button id="budgetPricesTab" type="button">Árlista</button>
       </nav>
       <p id="budgetStatus" role="status" aria-live="polite"></p>
       <section id="budgetSettlementsPanel">
       <div id="budgetWorksheetPicker">
-      <nav class="budget-week-navigation" aria-label="Költségvetés heti munkalapjai">
+      <nav class="budget-week-navigation" aria-label="Elszámolások heti munkalapjai">
         <button id="previousBudgetWeek" type="button" aria-label="Előző hét">‹</button>
         <div><span>HETI MUNKALAPOK</span><b id="budgetWeekLabel"></b></div>
         <button id="nextBudgetWeek" type="button" aria-label="Következő hét">›</button>
@@ -253,13 +253,11 @@
         <div><span>Még nem kifizetett</span><b id="statisticsOutstanding">0 Ft</b></div>
         <div><span>Kifizetett</span><b id="statisticsPaid">0 Ft</b></div>
       </section>
-      <section class="financial-summary" aria-label="Bevétel és kiadás">
-        <p class="financial-summary-title">A teljes kiválasztott időszak pénzügyi képe</p>
-        <div><span>Várható bevétel (munkalapok)</span><b id="statisticsWorkIncome">0 Ft</b></div>
+      <section class="financial-summary" aria-label="Kassza bevétel és kiadás">
+        <p class="financial-summary-title">A Kasszába kézzel rögzített tételek</p>
         <div><span>Kasszában rögzített bevétel</span><b id="statisticsCashIncome">0 Ft</b></div>
         <div><span>Kassza kiadás</span><b id="statisticsCashExpense">0 Ft</b></div>
-        <div><span>Várható eredmény</span><b id="statisticsExpectedResult">0 Ft</b></div>
-        <div><span>Tényleges pénzforgalmi eredmény</span><b id="statisticsActualResult">0 Ft</b></div>
+        <div><span>Egyenleg</span><b id="statisticsActualResult">0 Ft</b></div>
       </section>
       <div class="statistics-table-wrap"><table class="statistics-table"><thead><tr><th>Dátum</th><th>Ügyfél</th><th>Helyszín</th><th>Csoportvezető</th><th>Számított érték</th><th>Elszámolás</th><th>Megnyitás</th></tr></thead><tbody id="statisticsRows"></tbody></table></div>
     </section>
@@ -307,13 +305,12 @@
   </dialog>
   <dialog id="successDialog"><h2>Köszönöm, hogy beküldted a Munkalapot 😊</h2><p>Nagyon Cuki vagy ❤️</p><button id="newWorksheet" type="button">Új munkalap</button></dialog>
 
-  <script src="supabase.js?v=45"></script>
-  <script src="supabase-config.js?v=45"></script>
-  <script src="munkalap-data.js?v=45"></script>
-  <script src="app.js?v=45"></script>
-  <script src="billing-math.js?v=45"></script>
-  <script src="billing-settlements.js?v=45"></script>
-  <script src="statistics-finance.js?v=45"></script>
-  <script src="statistics-settlements.js?v=45"></script>
+  <script src="supabase.js?v=46"></script>
+  <script src="supabase-config.js?v=46"></script>
+  <script src="munkalap-data.js?v=46"></script>
+  <script src="app.js?v=46"></script>
+  <script src="billing-math.js?v=46"></script>
+  <script src="billing-settlements.js?v=46"></script>
+  <script src="statistics-settlements.js?v=46"></script>
 </body>
 </html>

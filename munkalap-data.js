@@ -644,15 +644,13 @@
         if (previewProfile?.role !== 'manager') throw new Error('Nincs jogosultság.');
         return structuredClone(Array.from(previewSettlements.values()));
       }
-      const [{data:rows,error},{data:links,error:linkError},{data:cashLinks,error:cashLinkError}]=await Promise.all([
+      const [{data:rows,error},{data:links,error:linkError}]=await Promise.all([
         client.from('billing_settlements').select('*').order('period_end',{ascending:false}),
-        client.from('billing_settlement_worksheets').select('settlement_id,worksheet_id'),
-        client.rpc('billing_cash_links')
+        client.from('billing_settlement_worksheets').select('settlement_id,worksheet_id')
       ]);
-      if(error) throw error;if(linkError) throw linkError;if(cashLinkError) throw cashLinkError;
+      if(error) throw error;if(linkError) throw linkError;
       const bySettlement=new Map();for(const link of links){const ids=bySettlement.get(link.settlement_id)||[];ids.push(link.worksheet_id);bySettlement.set(link.settlement_id,ids);}
-      const cashBySettlement=new Map((cashLinks||[]).map(link=>[link.settlement_id,link]));
-      return rows.map(row=>({...row,worksheet_ids:bySettlement.get(row.id)||[],cash_entry:cashBySettlement.get(row.id)||null}));
+      return rows.map(row=>({...row,worksheet_ids:bySettlement.get(row.id)||[]}));
     },
 
     async financialSummary(from,to) {
@@ -670,7 +668,6 @@
         if (previewProfile?.role !== 'manager') throw new Error('Nincs jogosultság.');
         const subtotal=BillingMath.total(settlement.items),discount=settlement.discount_type==='percent'?subtotal*Number(settlement.discount_value||0)/100:settlement.discount_type==='amount'?Number(settlement.discount_value||0):0;
         const worksheetIds=[...new Set(settlement.worksheet_ids)],row={...structuredClone(settlement),worksheet_ids:worksheetIds,id:settlement.id||crypto.randomUUID(),subtotal,total:Math.max(0,subtotal-discount),updated_at:new Date().toISOString()};
-        row.cash_entry=row.status==='paid'?{settlement_id:row.id,cash_entry_id:row.cash_entry?.cash_entry_id||crypto.randomUUID(),cash_entry_date:row.cash_entry?.cash_entry_date||new Date().toISOString().slice(0,10),cash_amount:Math.round(row.total)}:null;
         for(const [id,existing] of previewSettlements){if(id===row.id||!existing.worksheet_ids?.some(worksheetId=>worksheetIds.includes(worksheetId)))continue;if(!existing.worksheet_ids.every(worksheetId=>worksheetIds.includes(worksheetId)))throw new Error('Egy korábbi elszámolás teljes munkalapcsoportját ki kell jelölni az összevonáshoz.');previewSettlements.delete(id);}
         previewSettlements.set(row.id,row);return structuredClone(row);
       }

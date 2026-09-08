@@ -1,4 +1,4 @@
-# Irodai költségvetés – első ütem
+# Irodai elszámolások
 
 - Az `office_billing_drafts_and_prices` migráció az élő adatbázisban telepítve.
 - Új környezetben a `billing-setup.sql`, majd a `billing-catalog.sql` futtatandó; a séma létrehozását nem kell megismételni.
