@@ -1,7 +1,7 @@
 const EMAIL_ENDPOINT = "https://formsubmit.co/ajax/info@diszkertek.hu";
 const EMAIL_RECIPIENT = "info@diszkertek.hu";
 const STABLE_APP_URL = "https://agnesgeller.github.io/diszkertek-munkalap/";
-const APP_VERSION = "49";
+const APP_VERSION = "50";
 const QUEUE_KEY = "diszkertek-munkalap-send-queue-v1";
 const MANAGER_VIEW_KEY = "diszkertek-munkalap-manager-view-v1";
 const DATABASE_FREE_LIMIT = 500 * 1024 * 1024;
@@ -169,9 +169,9 @@ function formatSubjectDate(value) {
 function renderTeams() {
   $("#teams").innerHTML = [1, 2, 3].map(index => `
     <div class="time-row team-row">
-      <label><span>Csapat ${index}:</span><input name="team_${index}_size" inputmode="numeric"><em>fő</em></label>
-      <label><span>Érkezés:</span><input name="team_${index}_arrival" type="time"></label>
-      <label><span>Távozás:</span><input name="team_${index}_departure" type="time"></label>
+      <label><span>Csapat ${index}:</span><input name="team_${index}_size" inputmode="numeric" pattern="[1-9][0-9]{0,2}" ${index === 1 ? "required" : ""}><em>fő</em></label>
+      <label><span>Érkezés:</span><input name="team_${index}_arrival" type="time" ${index === 1 ? "required" : ""}></label>
+      <label><span>Távozás:</span><input name="team_${index}_departure" type="time" ${index === 1 ? "required" : ""}></label>
     </div>`).join("");
 }
 
@@ -465,6 +465,37 @@ function customerNameKey(value) {
   return searchKey(value).replace(/ zoli$/, " zoltan");
 }
 
+function validateTeamRows() {
+  let firstInvalid = null;
+  for (let index = 1; index <= 3; index += 1) {
+    const size = form.elements[`team_${index}_size`];
+    const arrival = form.elements[`team_${index}_arrival`];
+    const departure = form.elements[`team_${index}_departure`];
+    for (const field of [size, arrival, departure]) field.setCustomValidity("");
+    const hasAnyValue = Boolean(size.value.trim() || arrival.value || departure.value);
+    if (index !== 1 && !hasAnyValue) continue;
+    if (!/^[1-9][0-9]{0,2}$/.test(size.value.trim())) {
+      size.setCustomValidity(`Add meg a(z) ${index}. csapat létszámát 1 és 999 fő között.`);
+      firstInvalid ||= size;
+    }
+    if (!arrival.value) {
+      arrival.setCustomValidity(`Add meg a(z) ${index}. csapat érkezési idejét.`);
+      firstInvalid ||= arrival;
+    }
+    if (!departure.value) {
+      departure.setCustomValidity(`Add meg a(z) ${index}. csapat távozási idejét.`);
+      firstInvalid ||= departure;
+    } else if (arrival.value && departure.value <= arrival.value) {
+      departure.setCustomValidity("A távozási időnek későbbinek kell lennie az érkezésnél.");
+      firstInvalid ||= departure;
+    }
+  }
+  if (!firstInvalid) return true;
+  firstInvalid.reportValidity();
+  showStatus("Ellenőrizd a csapat létszámát, érkezési és távozási idejét.");
+  return false;
+}
+
 function worksheetFromForm(existing) {
   const data = formDataObject();
   const customer = customerDirectory.find(item => customerNameKey(item.fullName) === customerNameKey(data.customerName));
@@ -497,7 +528,7 @@ function updateWorksheetCache(saved) {
 
 form.addEventListener("submit", async event => {
   event.preventDefault();
-  if (!session || !form.reportValidity()) return;
+  if (!session || !form.reportValidity() || !validateTeamRows()) return;
   if (pendingCurrentQueueId) {
     showStatus("Ez a munkalap már küldésre vár. Nem mentettük el még egyszer.", "pending");
     return;
@@ -1610,6 +1641,7 @@ $("#newWorksheet").addEventListener("click", () => {
   window.scrollTo({ top: 0, behavior: "smooth" });
 });
 form.addEventListener("input", () => { formDirty = true; });
+$("#teams").addEventListener("input", event => event.target.setCustomValidity?.(""));
 
 const dateField = form.elements.date;
 const dateDialog = $("#dateDialog");
