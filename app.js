@@ -1,7 +1,7 @@
 const EMAIL_ENDPOINT = "https://formsubmit.co/ajax/info@diszkertek.hu";
 const EMAIL_RECIPIENT = "info@diszkertek.hu";
 const STABLE_APP_URL = "https://agnesgeller.github.io/diszkertek-munkalap/";
-const APP_VERSION = "47";
+const APP_VERSION = "49";
 const QUEUE_KEY = "diszkertek-munkalap-send-queue-v1";
 const MANAGER_VIEW_KEY = "diszkertek-munkalap-manager-view-v1";
 const DATABASE_FREE_LIMIT = 500 * 1024 * 1024;
@@ -44,6 +44,7 @@ let editingId = null;
 let worksheetReturnView = "";
 let formDirty = false;
 let installPrompt = null;
+let successDialogTimer = null;
 let serviceWorkerRegistration = null;
 let updateReloadPending = false;
 let externalEmailInProgress = false;
@@ -265,6 +266,16 @@ function showStatus(message, kind = "error") {
 function clearStatus() {
   statusBox.textContent = "";
   statusBox.className = "status";
+}
+
+function showSuccessDialog() {
+  const dialog = $("#successDialog");
+  clearTimeout(successDialogTimer);
+  if (!dialog.open) dialog.showModal();
+  successDialogTimer = setTimeout(() => {
+    if (dialog.open) dialog.close();
+    successDialogTimer = null;
+  }, 3000);
 }
 
 function readQueue() {
@@ -544,7 +555,7 @@ form.addEventListener("submit", async event => {
 
     if (!databaseError && !emailError) {
       resetForm();
-      $("#successDialog").showModal();
+      showSuccessDialog();
       return;
     }
 
@@ -561,7 +572,7 @@ form.addEventListener("submit", async event => {
     if (!emailError) {
       resetForm();
       updateQueueNotice();
-      $("#successDialog").showModal();
+      showSuccessDialog();
       return;
     }
 
@@ -600,7 +611,7 @@ $("#fallbackSent").addEventListener("click", () => {
   $("#fallbackConfirmDialog").close();
   fallbackEmailContext = null;
   resetForm();
-  $("#successDialog").showModal();
+  showSuccessDialog();
   syncQueue();
 });
 
@@ -1591,6 +1602,8 @@ $("#cancelEdit").addEventListener("click", () => {
   if (returnView) setManagerView(returnView);
 });
 $("#newWorksheet").addEventListener("click", () => {
+  clearTimeout(successDialogTimer);
+  successDialogTimer = null;
   $("#successDialog").close();
   resetForm();
   if (updateReloadPending) { window.location.reload(); return; }
