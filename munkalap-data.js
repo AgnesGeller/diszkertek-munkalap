@@ -430,6 +430,9 @@
       const ids = customerRows.map(row => row.id);
       let locationRows = [];
       let detailRows = [];
+      let referrerRows = [];
+      let payoutRows = [];
+      let referrerNameRows = [];
       if (ids.length) {
         const locationsResult = await client
           .from("customer_locations")
@@ -445,6 +448,27 @@
             .in("customer_id", ids);
           if (detailsResult.error) throw detailsResult.error;
           detailRows = detailsResult.data || [];
+          const referrersResult = await client
+            .from("customer_referrers")
+            .select("id,customer_id,full_name,percentage,starts_on,ends_on,active")
+            .in("customer_id", ids)
+            .order("starts_on", { ascending: false });
+          if (referrersResult.error) throw referrersResult.error;
+          referrerRows = referrersResult.data || [];
+          const referrerIds = referrerRows.map(row => row.id);
+          if (referrerIds.length) {
+            const payoutsResult = await client
+              .from("referrer_payouts")
+              .select("id,referrer_id,paid_on,amount,note")
+              .in("referrer_id", referrerIds)
+              .order("paid_on", { ascending: false });
+            if (payoutsResult.error) throw payoutsResult.error;
+            payoutRows = payoutsResult.data || [];
+          }
+        } else {
+          const namesResult = await client.rpc("list_customer_referrer_names");
+          if (namesResult.error) throw namesResult.error;
+          referrerNameRows = namesResult.data || [];
         }
       }
       const detailsByCustomer = new Map(detailRows.map(row => [row.customer_id, row]));
@@ -464,6 +488,21 @@
           taxNumber: detail.tax_number || "",
           billingMode: detail.billing_mode === "flat_monthly" ? "monthly_grouped" : (detail.billing_mode || "per_job"),
           notes: detail.notes || "",
+          referrerNames: referrerNameRows.find(item => item.customer_id === row.id)?.names || "",
+          referrers: referrerRows.filter(referrer => referrer.customer_id === row.id).map(referrer => ({
+            id: referrer.id,
+            fullName: referrer.full_name,
+            percentage: Number(referrer.percentage),
+            startsOn: referrer.starts_on,
+            endsOn: referrer.ends_on,
+            active: referrer.active,
+            payouts: payoutRows.filter(payout => payout.referrer_id === referrer.id).map(payout => ({
+              id: payout.id,
+              paidOn: payout.paid_on,
+              amount: Number(payout.amount),
+              note: payout.note || ""
+            }))
+          })),
           locations: locationRows.filter(location => location.customer_id === row.id).map(location => ({
             id: location.id,
             label: location.label || "",
@@ -477,20 +516,35 @@
 
     async saveCustomer(customer) {
       if (previewMode) {
+        const previous = previewCustomers.find(item => item.id === customer.id);
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const endDate = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, "0")}-${String(tomorrow.getDate()).padStart(2, "0")}`;
+        const activeReferrers = (customer.referrers || []).map((referrer, index) => ({
+          ...referrer,
+          id: referrer.id || `bemutato-ajanlo-${Date.now()}-${index}`,
+          active: true,
+          endsOn: null,
+          payouts: previous?.referrers?.find(item => item.id === referrer.id)?.payouts || []
+        }));
+        const retainedIds = new Set(activeReferrers.map(referrer => referrer.id));
+        const closedReferrers = (previous?.referrers || []).filter(referrer => !retainedIds.has(referrer.id))
+          .map(referrer => referrer.active ? { ...referrer, active: false, endsOn: endDate } : referrer);
         const saved = {
           ...customer,
           id: customer.id || `bemutato-ugyfel-${Date.now()}`,
           locations: (customer.locations || []).map((location, index) => ({
             ...location,
             id: location.id || `bemutato-hely-${Date.now()}-${index}`
-          }))
+          })),
+          referrers: [...activeReferrers, ...closedReferrers]
         };
         const index = previewCustomers.findIndex(item => item.id === saved.id);
         if (index >= 0) previewCustomers[index] = saved;
         else previewCustomers.push(saved);
         return saved;
       }
-      const { data, error } = await client.rpc("save_customer", {
+      const { data, error } = await client.rpc("save_customer_with_referrers", {
         saved_customer_id: customer.id || null,
         saved_full_name: customer.fullName.trim(),
         saved_active: customer.active !== false,
@@ -503,10 +557,35 @@
         saved_billing_mode: customer.billingMode || "per_job",
         saved_notes: customer.notes || "",
         saved_locations: customer.locations || [],
-        removed_location_ids: customer.removedLocationIds || []
+        removed_location_ids: customer.removedLocationIds || [],
+        saved_referrers: customer.referrers || []
       });
       if (error) throw error;
       return data;
+    },
+
+    async addReferrerPayout(referrerId, paidOn, amount, note = "") {
+      if (previewMode) {
+        const referrer = previewCustomers.flatMap(customer => customer.referrers || []).find(item => item.id === referrerId);
+        if (!referrer) throw new Error("Az ajánló nem található.");
+        (referrer.payouts ||= []).unshift({ id: `bemutato-kifizetes-${Date.now()}`, paidOn, amount, note });
+        return;
+      }
+      const { error } = await client.from("referrer_payouts").insert({
+        referrer_id: referrerId, paid_on: paidOn, amount, note
+      });
+      if (error) throw error;
+    },
+
+    async removeReferrerPayout(id) {
+      if (previewMode) {
+        for (const referrer of previewCustomers.flatMap(customer => customer.referrers || [])) {
+          referrer.payouts = (referrer.payouts || []).filter(payout => payout.id !== id);
+        }
+        return;
+      }
+      const { error } = await client.from("referrer_payouts").delete().eq("id", id);
+      if (error) throw error;
     },
 
     async registerCustomerSuggestion(name, address) {

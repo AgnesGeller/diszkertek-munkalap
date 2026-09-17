@@ -6,13 +6,13 @@
   <meta name="theme-color" content="#315f37">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Munkalap">
-  <link rel="manifest" href="manifest.webmanifest?v=50">
+  <link rel="manifest" href="manifest.webmanifest?v=52">
   <link rel="icon" href="munkalap-m-favicon-v12.ico" sizes="any">
   <link rel="icon" href="munkalap-m-icon-32-v12.png" type="image/png" sizes="32x32">
   <link rel="apple-touch-icon" href="munkalap-m-icon-apple-180-v12.png">
-  <link rel="stylesheet" href="styles.css?v=50">
-  <link rel="stylesheet" href="logo-overrides.css?v=50">
-  <link rel="stylesheet" href="app-shell.css?v=50">
+  <link rel="stylesheet" href="styles.css?v=52">
+  <link rel="stylesheet" href="logo-overrides.css?v=52">
+  <link rel="stylesheet" href="app-shell.css?v=52">
   <title>Díszkertek – Napi munkalap</title>
   <meta name="description" content="Díszkertek napi munkalapok és ügyfélnyilvántartás.">
   <meta property="og:title" content="Díszkertek – Napi munkalap">
@@ -77,6 +77,7 @@
           <label class="date"><b>Dátum:</b><span class="date-control"><input name="date" type="text" inputmode="numeric" placeholder="2026. 08. 15." aria-label="Dátum magyar formátumban" required><button id="datePickerButton" type="button">📅 Választás</button></span></label>
           <label class="wide customer-field"><b>Ügyfél neve:</b><input name="customerName" autocomplete="off" required aria-controls="customerSuggestions" aria-expanded="false"><span id="customerSuggestions" class="customer-suggestions" hidden></span></label>
           <label class="wide customer-field"><b>Cím:</b><input name="address" autocomplete="off" required aria-controls="addressSuggestions" aria-expanded="false"><span id="addressSuggestions" class="customer-suggestions" hidden></span></label>
+          <label class="wide worksheet-referrers"><b>Ajánló személyek:</b><input name="referrerNames" autocomplete="off" maxlength="500" aria-label="Ajánló személyek, vesszővel elválasztva" placeholder="Több név esetén vesszővel válaszd el"></label>
         </section>
 
         <section class="worktime">
@@ -202,6 +203,7 @@
           <p class="budget-total"><small>Számított érték</small><strong id="budgetTotal"></strong></p>
         </header>
         <div id="budgetLocations" class="budget-locations"></div>
+        <section id="budgetReferrers" class="referrer-panel" hidden></section>
         <p id="budgetSourceWarning" class="budget-warning" hidden></p>
         <div id="budgetItems"></div>
         <details class="budget-add-item">
@@ -295,6 +297,13 @@
         <label>Adószám<input name="taxNumber"></label>
         <label>Elszámolás módja<select name="billingMode"><option value="per_job">Külön minden munkalap után</option><option value="monthly_grouped">Havi összesítés</option><option value="manual">Egyedi</option></select></label>
         <label class="wide">Helyszínek – soronként egy cím<textarea name="locations" rows="5"></textarea></label>
+        <section class="wide customer-referrers referrer-panel" aria-label="Ajánló személyek">
+          <h3>Ajánló személyek</h3>
+          <p>Az ajánlói időszak a kezdő dátumtól egy évig tart. A jutalék alapja a kedvezmény utáni elszámolási összeg.</p>
+          <div id="customerReferrerRows"></div>
+          <button id="customerAddReferrer" type="button">+ Ajánló hozzáadása</button>
+          <div id="customerPayouts" hidden></div>
+        </section>
         <label class="wide">Irodai megjegyzés<textarea name="notes" rows="3"></textarea></label>
         <label class="check-label"><input name="approved" type="checkbox"> Látható a dolgozók ügyféllistájában</label>
         <label class="check-label"><input name="active" type="checkbox" checked> Aktív ügyfél</label>
@@ -305,12 +314,12 @@
   </dialog>
   <dialog id="successDialog"><h2>Köszönöm, hogy beküldted a Munkalapot 😊</h2><p>Nagyon Cuki vagy ❤️</p><button id="newWorksheet" type="button">Új munkalap</button></dialog>
 
-  <script src="supabase.js?v=50"></script>
-  <script src="supabase-config.js?v=50"></script>
-  <script src="munkalap-data.js?v=50"></script>
-  <script src="app.js?v=50"></script>
-  <script src="billing-math.js?v=50"></script>
-  <script src="billing-settlements.js?v=50"></script>
-  <script src="statistics-settlements.js?v=50"></script>
+  <script src="supabase.js?v=52"></script>
+  <script src="supabase-config.js?v=52"></script>
+  <script src="munkalap-data.js?v=52"></script>
+  <script src="app.js?v=52"></script>
+  <script src="billing-math.js?v=52"></script>
+  <script src="billing-settlements.js?v=52"></script>
+  <script src="statistics-settlements.js?v=52"></script>
 </body>
 </html>

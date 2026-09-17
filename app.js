@@ -1,7 +1,7 @@
 const EMAIL_ENDPOINT = "https://formsubmit.co/ajax/info@diszkertek.hu";
 const EMAIL_RECIPIENT = "info@diszkertek.hu";
 const STABLE_APP_URL = "https://agnesgeller.github.io/diszkertek-munkalap/";
-const APP_VERSION = "50";
+const APP_VERSION = "52";
 const QUEUE_KEY = "diszkertek-munkalap-send-queue-v1";
 const MANAGER_VIEW_KEY = "diszkertek-munkalap-manager-view-v1";
 const DATABASE_FREE_LIMIT = 500 * 1024 * 1024;
@@ -203,6 +203,7 @@ function buildEmailPayload(data, modified = false) {
     "Ügyfél neve": data.customerName,
     "Cím": data.address
   };
+  addIfFilled(payload, "Ajánló személyek", data.referrerNames);
   [1, 2, 3].forEach(index => {
     const size = data[`team_${index}_size`];
     const arrival = data[`team_${index}_arrival`];
@@ -738,6 +739,7 @@ function worksheetCardHTML(item, office = false) {
       ${subcontractor ? `<p><b>Alvállalkozó:</b> ${escapeHTML(subcontractor)}</p>` : ""}
       ${item.customer ? `<p><b>Ügyfél:</b> ${escapeHTML(item.customer)}</p>` : ""}
       ${item.address ? `<p><b>Cím:</b> ${escapeHTML(item.address)}</p>` : ""}
+      ${data.referrerNames ? `<p class="referrer-note"><b>Ajánló személyek:</b> ${escapeHTML(data.referrerNames)}</p>` : ""}
       ${item.date ? `<p><b>Dátum:</b> ${escapeHTML(formatHungarianDate(item.date))}</p>` : ""}
       ${materials.length ? `<div class="summary-group"><b>Tételek:</b>${listHTML(materials)}</div>` : ""}
       ${rentals.length ? `<div class="summary-group"><b>Gépbérlés:</b>${listHTML(rentals)}</div>` : ""}
@@ -921,6 +923,8 @@ function chooseCustomerSuggestion(button) {
   selectedLocationId = button.dataset.locationId || null;
   form.elements.customerName.value = button.dataset.customerName || "";
   form.elements.address.value = button.dataset.address || "";
+  const customer = customerDirectory.find(item => item.id === selectedCustomerId);
+  form.elements.referrerNames.value = customer?.referrerNames || (customer?.referrers || []).filter(item => item.active).map(item => item.fullName).join(", ");
   hideCustomerSuggestions($("#customerSuggestions"));
   hideCustomerSuggestions($("#addressSuggestions"));
   formDirty = true;
@@ -994,6 +998,7 @@ function renderCustomers() {
       </div></div><button type="button" data-customer-edit="${escapeHTML(customer.id)}">Szerkesztés</button></header>
       ${(customer.locations || []).some(location => location.active !== false) ? `<p><b>Helyszínek:</b> ${(customer.locations || []).filter(location => location.active !== false).map(location => escapeHTML(location.address)).join(" · ")}</p>` : `<p><b>Helyszín:</b> még nincs megadva</p>`}
       ${customer.email || customer.phone ? `<p><b>Kapcsolat:</b> ${escapeHTML([customer.email, customer.phone].filter(Boolean).join(" · "))}</p>` : ""}
+      ${(customer.referrers || []).length ? `<p class="referrer-note"><b>Ajánlók:</b> ${customer.referrers.map(referrer => `${escapeHTML(referrer.fullName)} · ${escapeHTML(referrer.percentage)}% · ${escapeHTML(formatHungarianDate(referrer.startsOn))}${referrer.active ? "" : " · lezárt"}`).join("; ")}</p>` : ""}
       <div class="card-actions"><button class="delete-button" type="button" data-customer-delete="${escapeHTML(customer.id)}">Törlés</button></div>
     </article>`).join("") : `<p class="empty-list">Nincs a keresésnek megfelelő ügyfél.</p>`;
 }
@@ -1013,10 +1018,80 @@ function openCustomerDialog(customer = null) {
   customerForm.elements.notes.value = customer?.notes || "";
   customerForm.elements.approved.checked = customer?.reviewStatus === "approved";
   customerForm.elements.active.checked = customer?.active !== false;
+  renderCustomerReferrers(customer);
   $("#customerDialogTitle").textContent = customer ? "Ügyfél szerkesztése" : "Új ügyfél";
   $("#customerDialogStatus").textContent = "";
   $("#customerDialog").showModal();
 }
+
+function renderCustomerReferrers(customer) {
+  const rows = (customer?.referrers || []).filter(referrer => referrer.active);
+  $("#customerReferrerRows").innerHTML = rows.map(referrer => customerReferrerRowHTML(referrer)).join("");
+  renderCustomerPayouts(customer);
+}
+
+function customerReferrerRowHTML(referrer = {}) {
+  return `<div class="customer-referrer-row" data-referrer-id="${escapeHTML(referrer.id || "")}">
+    <label>Név<input data-referrer-field="fullName" maxlength="160" required value="${escapeHTML(referrer.fullName || "")}"></label>
+    <label>Jutalék (%)<input data-referrer-field="percentage" type="number" min="0.01" max="100" step="0.01" required value="${escapeHTML(referrer.percentage ?? "")}"></label>
+    <label>Kezdő dátum<input data-referrer-field="startsOn" type="date" required value="${escapeHTML(referrer.startsOn || "")}"></label>
+    <button type="button" data-remove-referrer>Ajánló törlése</button>
+  </div>`;
+}
+
+function renderCustomerPayouts(customer) {
+  const box = $("#customerPayouts");
+  const referrers = (customer?.referrers || []).filter(referrer => referrer.id);
+  box.hidden = !referrers.length;
+  if (!referrers.length) { box.innerHTML = ""; return; }
+  box.innerHTML = `<h4>Előre kifizetett jutalékok</h4><p>A kifizetés a bevétel beérkezése előtt is rögzíthető.</p>
+    <div class="customer-payout-entry"><label>Ajánló<select id="payoutReferrer">${referrers.map(referrer => `<option value="${escapeHTML(referrer.id)}">${escapeHTML(referrer.fullName)}${referrer.active ? "" : " (lezárt)"}</option>`).join("")}</select></label>
+    <label>Dátum<input id="payoutDate" type="date" value="${escapeHTML(isoToday())}"></label>
+    <label>Összeg (Ft)<input id="payoutAmount" type="number" min="1" max="9999999999" step="0.01"></label>
+    <label>Megjegyzés<input id="payoutNote" maxlength="500"></label><button type="button" id="payoutAdd">Kifizetés rögzítése</button></div>
+    ${referrers.flatMap(referrer => (referrer.payouts || []).map(payout => `<p class="payout-record">${escapeHTML(referrer.fullName)} · ${escapeHTML(formatHungarianDate(payout.paidOn))} · ${escapeHTML(new Intl.NumberFormat("hu-HU", { maximumFractionDigits: 0 }).format(payout.amount))} Ft${payout.note ? ` · ${escapeHTML(payout.note)}` : ""} <button type="button" data-remove-payout="${escapeHTML(payout.id)}">Törlés</button></p>`)).join("")}`;
+}
+
+$("#customerAddReferrer").addEventListener("click", () => {
+  $("#customerReferrerRows").insertAdjacentHTML("beforeend", customerReferrerRowHTML());
+});
+$("#customerReferrerRows").addEventListener("click", event => {
+  const row = event.target.closest("[data-remove-referrer]")?.closest(".customer-referrer-row");
+  if (!row) return;
+  const name = row.querySelector('[data-referrer-field="fullName"]').value.trim() || "ezt az ajánlót";
+  if (row.dataset.referrerId && !confirm(`Törlöd ${name} ajánlói jogát? Mentés után a későbbi munkákra már nem jár jutalék; a korábbi kifizetések megmaradnak.`)) return;
+  row.remove();
+  $("#customerDialogStatus").textContent = "Az ajánló törlése a Mentés gombbal válik véglegessé.";
+});
+$("#customerPayouts").addEventListener("click", async event => {
+  const add = event.target.closest("#payoutAdd");
+  const remove = event.target.closest("[data-remove-payout]");
+  if (!add && !remove) return;
+  const customer = customerDirectory.find(item => item.id === $("#customerForm").elements.id.value);
+  if (!customer) return;
+  try {
+    if (add) {
+      const referrerId = $("#payoutReferrer").value;
+      const paidOn = $("#payoutDate").value;
+      const amount = Number($("#payoutAmount").value);
+      if (!referrerId || !paidOn || !Number.isFinite(amount) || amount <= 0) throw new Error("Add meg az ajánlót, a dátumot és a pozitív összeget.");
+      add.disabled = true;
+      await MunkalapDB.addReferrerPayout(referrerId, paidOn, amount, $("#payoutNote").value.trim());
+    } else {
+      if (!confirm("Biztosan törlöd ezt a kifizetési bejegyzést?")) return;
+      remove.disabled = true;
+      await MunkalapDB.removeReferrerPayout(remove.dataset.removePayout);
+    }
+    await loadCustomers(true, true);
+    const refreshed = customerDirectory.find(item => item.id === customer.id);
+    renderCustomerPayouts(refreshed);
+    $("#customerDialogStatus").textContent = add ? "A kifizetést rögzítettük." : "A kifizetési bejegyzést töröltük.";
+  } catch (error) {
+    $("#customerDialogStatus").textContent = `A kifizetés mentése nem sikerült: ${error?.message || "ismeretlen hiba"}.`;
+    if (add) add.disabled = false;
+    if (remove) remove.disabled = false;
+  }
+});
 
 $("#customerSearch").addEventListener("input", renderCustomers);
 $("#customerAlphabet").addEventListener("click", event => {
@@ -1042,7 +1117,7 @@ $("#customersList").addEventListener("click", async event => {
       renderCustomers();
       $("#customersStatus").textContent = "Az ügyfelet töröltük.";
     } catch (_) {
-      $("#customersStatus").textContent = "Ehhez az ügyfélhez már tartozik munkalap vagy helyszín. Törlés helyett kapcsold ki az Aktív ügyfél jelölést.";
+      $("#customersStatus").textContent = "Ehhez az ügyfélhez már tartozik munkalap, helyszín vagy ajánlói adat. Törlés helyett kapcsold ki az Aktív ügyfél jelölést.";
     }
   }
 });
@@ -1057,6 +1132,16 @@ $("#customerForm").addEventListener("submit", async event => {
     const saved = existing?.locations?.find(location => searchKey(location.address) === searchKey(address));
     return { id: saved?.id, address, label: saved?.label || "", active: true, reviewStatus: customerForm.elements.approved.checked ? "approved" : "pending" };
   });
+  const referrers = [...$("#customerReferrerRows").querySelectorAll(".customer-referrer-row")].map(row => ({
+    id: row.dataset.referrerId || null,
+    fullName: row.querySelector('[data-referrer-field="fullName"]').value.trim(),
+    percentage: Number(row.querySelector('[data-referrer-field="percentage"]').value),
+    startsOn: row.querySelector('[data-referrer-field="startsOn"]').value
+  }));
+  if (referrers.reduce((sum, referrer) => sum + referrer.percentage, 0) > 100) {
+    $("#customerDialogStatus").textContent = "Az ajánlók százalékainak összege nem lehet több 100-nál.";
+    return;
+  }
   const payload = {
     id: existing?.id,
     fullName: customerForm.elements.fullName.value.trim(),
@@ -1070,6 +1155,7 @@ $("#customerForm").addEventListener("submit", async event => {
     reviewStatus: customerForm.elements.approved.checked ? "approved" : "pending",
     active: customerForm.elements.active.checked,
     locations,
+    referrers,
     removedLocationIds: (existing?.locations || []).filter(location => !locations.some(saved => saved.id === location.id)).map(location => location.id)
   };
   const saveButton = $("#customerSave");
