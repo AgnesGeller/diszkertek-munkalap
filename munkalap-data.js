@@ -450,7 +450,7 @@
           detailRows = detailsResult.data || [];
           const referrersResult = await client
             .from("customer_referrers")
-            .select("id,customer_id,full_name,percentage,starts_on,ends_on,active")
+            .select("id,customer_id,full_name,percentage,starts_on,ends_on,active,updated_at")
             .in("customer_id", ids)
             .order("starts_on", { ascending: false });
           if (referrersResult.error) throw referrersResult.error;
@@ -496,6 +496,7 @@
             startsOn: referrer.starts_on,
             endsOn: referrer.ends_on,
             active: referrer.active,
+            updatedAt: referrer.updated_at,
             payouts: payoutRows.filter(payout => payout.referrer_id === referrer.id).map(payout => ({
               id: payout.id,
               paidOn: payout.paid_on,

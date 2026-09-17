@@ -1,7 +1,7 @@
 const EMAIL_ENDPOINT = "https://formsubmit.co/ajax/info@diszkertek.hu";
 const EMAIL_RECIPIENT = "info@diszkertek.hu";
 const STABLE_APP_URL = "https://agnesgeller.github.io/diszkertek-munkalap/";
-const APP_VERSION = "54";
+const APP_VERSION = "55";
 const QUEUE_KEY = "diszkertek-munkalap-send-queue-v1";
 const MANAGER_VIEW_KEY = "diszkertek-munkalap-manager-view-v1";
 const DATABASE_FREE_LIMIT = 500 * 1024 * 1024;
@@ -985,6 +985,22 @@ function customerListPage(customers, query, letter) {
   return { available, selected, filtered, searching: Boolean(needle) };
 }
 
+function worksheetReferrersForCustomer(customer) {
+  const latest = worksheets.filter(row => (row.customerId === customer.id || (!row.customerId && customerNameKey(row.customer) === customerNameKey(customer.fullName))) && String(row.data?.referrerNames || "").trim())
+    .sort((a, b) => String(b.updatedAt || b.date).localeCompare(String(a.updatedAt || a.date)))[0];
+  if (!latest) return [];
+  const newestSaved = (customer.referrers || []).map(referrer => String(referrer.updatedAt || "")).sort().at(-1);
+  if (newestSaved && String(latest.updatedAt || latest.date) <= newestSaved) return [];
+  const configured = new Set((customer.referrers || []).filter(referrer => referrer.active).map(referrer => customerNameKey(referrer.fullName)));
+  const names = new Set();
+  return String(latest.data.referrerNames).split(",").map(name => name.trim()).filter(name => {
+    const key = customerNameKey(name);
+    if (!key || names.has(key) || configured.has(key)) return false;
+    names.add(key);
+    return true;
+  }).map(fullName => ({ fullName, percentage: 0, startsOn: latest.date, active: true, fromWorksheet: true }));
+}
+
 function renderCustomers() {
   if (session?.role !== "manager") return;
   const { available, selected, filtered, searching } = customerListPage(customerDirectory, $("#customerSearch").value, customerLetter);
@@ -998,7 +1014,7 @@ function renderCustomers() {
       </div></div><button type="button" data-customer-edit="${escapeHTML(customer.id)}">Szerkesztés</button></header>
       ${(customer.locations || []).some(location => location.active !== false) ? `<p><b>Helyszínek:</b> ${(customer.locations || []).filter(location => location.active !== false).map(location => escapeHTML(location.address)).join(" · ")}</p>` : `<p><b>Helyszín:</b> még nincs megadva</p>`}
       ${customer.email || customer.phone ? `<p><b>Kapcsolat:</b> ${escapeHTML([customer.email, customer.phone].filter(Boolean).join(" · "))}</p>` : ""}
-      ${(customer.referrers || []).length ? `<p class="referrer-note"><b>Ajánlók:</b> ${customer.referrers.map(referrer => `${escapeHTML(referrer.fullName)} · ${escapeHTML(referrer.percentage)}% · ${escapeHTML(formatHungarianDate(referrer.startsOn))}${referrer.active ? "" : " · lezárt"}`).join("; ")}</p>` : ""}
+      ${[...(customer.referrers || []), ...worksheetReferrersForCustomer(customer)].length ? `<p class="referrer-note"><b>Ajánlók:</b> ${[...(customer.referrers || []), ...worksheetReferrersForCustomer(customer)].map(referrer => `${escapeHTML(referrer.fullName)} · ${escapeHTML(referrer.percentage)}% · ${escapeHTML(formatHungarianDate(referrer.startsOn))}${referrer.fromWorksheet ? " · a munkalapról, jutalék még nincs beállítva" : referrer.active ? "" : " · lezárt"}`).join("; ")}</p>` : ""}
       <div class="card-actions"><button class="delete-button" type="button" data-customer-delete="${escapeHTML(customer.id)}">Törlés</button></div>
     </article>`).join("") : `<p class="empty-list">Nincs a keresésnek megfelelő ügyfél.</p>`;
 }
@@ -1025,17 +1041,17 @@ function openCustomerDialog(customer = null) {
 }
 
 function renderCustomerReferrers(customer) {
-  const rows = (customer?.referrers || []).filter(referrer => referrer.active);
+  const rows = [...(customer?.referrers || []).filter(referrer => referrer.active), ...(customer ? worksheetReferrersForCustomer(customer) : [])];
   $("#customerReferrerRows").innerHTML = rows.map(referrer => customerReferrerRowHTML(referrer)).join("");
   renderCustomerPayouts(customer);
 }
 
 function customerReferrerRowHTML(referrer = {}) {
-  return `<div class="customer-referrer-row" data-referrer-id="${escapeHTML(referrer.id || "")}">
+  return `<div class="customer-referrer-row" data-referrer-id="${escapeHTML(referrer.id || "")}" ${referrer.fromWorksheet ? 'data-from-worksheet="true"' : ""}>
     <label>Név<input data-referrer-field="fullName" maxlength="160" required value="${escapeHTML(referrer.fullName || "")}"></label>
-    <label>Jutalék (%)<input data-referrer-field="percentage" type="number" min="0.01" max="100" step="0.01" required value="${escapeHTML(referrer.percentage ?? "")}"></label>
+    <label>Jutalék (%)<input data-referrer-field="percentage" type="number" min="0" max="100" step="0.01" required value="${escapeHTML(referrer.percentage ?? "")}"></label>
     <label>Kezdő dátum<input data-referrer-field="startsOn" type="date" required value="${escapeHTML(referrer.startsOn || "")}"></label>
-    <button type="button" data-remove-referrer>Ajánló törlése</button>
+    ${referrer.fromWorksheet ? '<small>A munkalapról átvett nevet ott törölheted, vagy itt mentéssel véglegesítheted.</small>' : '<button type="button" data-remove-referrer>Ajánló törlése</button>'}
   </div>`;
 }
 
@@ -1134,6 +1150,7 @@ $("#customerForm").addEventListener("submit", async event => {
   });
   const referrers = [...$("#customerReferrerRows").querySelectorAll(".customer-referrer-row")].map(row => ({
     id: row.dataset.referrerId || null,
+    fromWorksheet: row.dataset.fromWorksheet === "true",
     fullName: row.querySelector('[data-referrer-field="fullName"]').value.trim(),
     percentage: Number(row.querySelector('[data-referrer-field="percentage"]').value),
     startsOn: row.querySelector('[data-referrer-field="startsOn"]').value
@@ -1155,7 +1172,7 @@ $("#customerForm").addEventListener("submit", async event => {
     reviewStatus: customerForm.elements.approved.checked ? "approved" : "pending",
     active: customerForm.elements.active.checked,
     locations,
-    referrers,
+    referrers: referrers.map(({ fromWorksheet, ...referrer }) => referrer),
     removedLocationIds: (existing?.locations || []).filter(location => !locations.some(saved => saved.id === location.id)).map(location => location.id)
   };
   const saveButton = $("#customerSave");
@@ -1229,6 +1246,7 @@ async function loadOfficeWorksheets(showErrors = true) {
     worksheets = await MunkalapDB.listAll();
     officeLoaded = true;
     renderAll();
+    if (managerView === "customers") renderCustomers();
     showOfficeStatus("A teljes irodai lista betöltve.", "success");
   } catch (error) {
     if (showErrors) showOfficeStatus(`A teljes lista betöltése nem sikerült: ${error?.message || "ismeretlen hiba"}.`, "error");
@@ -1355,6 +1373,7 @@ function setManagerView(view, options = {}) {
   if (managerView === "customers") {
     renderCustomers();
     if (!customersLoaded) loadCustomers(true, true);
+    if (!officeLoaded) loadOfficeWorksheets(false).then(renderCustomers);
   }
   if (managerView === "budget") return window.Billing?.show();
   if (managerView === "statistics") return window.Statistics?.show();
