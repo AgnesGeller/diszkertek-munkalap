@@ -30,10 +30,15 @@ assert.deepEqual(Array.from(worksheetReferrerEntries(worksheet), item => [item.n
 setDraft({ customer_id: customerId, customer_name: 'Teszt', worksheet_ids: [worksheet.id], source_snapshots: [{ worksheetId: worksheet.id, worksheetUpdatedAt: worksheet.updatedAt, data: worksheet.data }], period_start: worksheet.date, period_end: worksheet.date, items: [] });
 renderReferrers();
 assert.equal(box.hidden, false);
+assert.equal(box.open, false);
+assert.match(box.innerHTML, /<summary>Ajánló személyek – csak belső használatra<\/summary>/);
 assert.match(box.innerHTML, /value="Teszt 2"/);
 assert.equal((box.innerHTML.match(/data-referrer-percent/g) || []).length, 2);
 assert.match(box.innerHTML, /form="budgetReferrerFields"/);
 assert.match(box.innerHTML, /value="0"/);
+box.open = true;
+renderReferrers();
+assert.equal(box.open, true);
 
 context.customerDirectory[0].referrers = [{ id: 'referrer-1', fullName: 'Javított név', percentage: 0, startsOn: worksheet.date, updatedAt: '2026-09-18T08:00:00Z', active: true, payouts: [] }];
 assert.deepEqual(Array.from(worksheetReferrerEntries(worksheet), item => [item.name, item.referrer?.percentage]), [['Javított név', 0]]);
@@ -41,4 +46,7 @@ renderReferrers();
 assert.match(box.innerHTML, /value="Javított név"/);
 assert.doesNotMatch(box.innerHTML, /value="Teszt 2"/);
 assert.match(box.innerHTML, /0% · nincs jutalék/);
+setDraft({ customer_id: customerId, customer_name: 'Teszt', worksheet_ids: ['worksheet-2'], source_snapshots: [{ worksheetId: 'worksheet-2', worksheetUpdatedAt: worksheet.updatedAt, data: worksheet.data }], period_start: worksheet.date, period_end: worksheet.date, items: [] });
+renderReferrers();
+assert.equal(box.open, false);
 console.log('PASS: ajánlók külön szerkesztése, 0% és ügyfélnyilvántartásból frissülő név.');
