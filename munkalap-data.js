@@ -525,6 +525,7 @@
           ...referrer,
           id: referrer.id || `bemutato-ajanlo-${Date.now()}-${index}`,
           active: true,
+          updatedAt: new Date().toISOString(),
           endsOn: null,
           payouts: previous?.referrers?.find(item => item.id === referrer.id)?.payouts || []
         }));

@@ -88,7 +88,7 @@ revoke all on function munkalap.save_customer_with_referrers(
   uuid, text, boolean, text, text, text, text, text, text, text, text, jsonb, uuid[], jsonb
 ) from public, anon;
 grant execute on function munkalap.save_customer_with_referrers(
-  uuid, text, boolean, text, text, text, text, text, text, text, jsonb, uuid[], jsonb
+  uuid, text, boolean, text, text, text, text, text, text, text, text, jsonb, uuid[], jsonb
 ) to authenticated, service_role;
 
 commit;
