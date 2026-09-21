@@ -425,6 +425,7 @@
       const { data: customerRows, error: customerError } = await client
         .from("customers")
         .select("id,full_name,active,review_status,created_at,updated_at")
+        .is("archived_at", null)
         .order("full_name", { ascending: true });
       if (customerError) throw customerError;
       const ids = customerRows.map(row => row.id);
@@ -605,9 +606,6 @@
       if (previewMode) {
         const index = previewCustomers.findIndex(customer => customer.id === id);
         if (index < 0) throw new Error("Az ügyfél nem található.");
-        if (previewWorksheets.some(worksheet => worksheet.customerId === id) || [...previewSettlements.values()].some(settlement => settlement.customer_id === id)) {
-          throw new Error("Ehhez az ügyfélhez már munkalap vagy elszámolás tartozik. Törlés helyett állítsd inaktívra.");
-        }
         previewCustomers.splice(index, 1);
         return id;
       }

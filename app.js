@@ -1,7 +1,7 @@
 const EMAIL_ENDPOINT = "https://formsubmit.co/ajax/info@diszkertek.hu";
 const EMAIL_RECIPIENT = "info@diszkertek.hu";
 const STABLE_APP_URL = "https://agnesgeller.github.io/diszkertek-munkalap/";
-const APP_VERSION = "60";
+const APP_VERSION = "61";
 const QUEUE_KEY = "diszkertek-munkalap-send-queue-v1";
 const MANAGER_VIEW_KEY = "diszkertek-munkalap-manager-view-v1";
 const DATABASE_FREE_LIMIT = 500 * 1024 * 1024;
@@ -62,7 +62,7 @@ let customerDirectory = [];
 let customerLetter = "";
 const CUSTOMER_LETTERS = [..."ABCDEFGHIJKLMNOPQRSTUVWXYZ", "#"];
 let customersLoaded = false;
-let customersLoading = false;
+let customersLoading = null;
 let selectedCustomerId = null;
 let selectedLocationId = null;
 let handlingAppHistory = false;
@@ -945,27 +945,35 @@ document.addEventListener("click", event => {
   }
 });
 
-async function loadCustomers(manager = session?.role === "manager", showErrors = false) {
-  if (!session || customersLoading) return;
-  const loadingSession = session;
-  customersLoading = true;
-  if (manager) $("#customersStatus").textContent = "Ügyféllista betöltése…";
-  try {
-    const loadedCustomers = await MunkalapDB.listCustomers(Boolean(manager));
-    if (session !== loadingSession) return;
-    customerDirectory = loadedCustomers;
-    customersLoaded = true;
-    renderCustomers();
-    updateSuggestions();
-    if (manager) renderOffice();
-    if (manager) $("#customersStatus").textContent = "";
-  } catch (error) {
-    if (session !== loadingSession) return;
-    customersLoaded = false;
-    if (manager && showErrors) $("#customersStatus").textContent = `Az ügyféllista nem tölthető be: ${error?.message || "ismeretlen hiba"}.`;
-  } finally {
-    if (session === loadingSession) customersLoading = false;
+async function loadCustomers(manager = session?.role === "manager", showErrors = false, force = false) {
+  if (!session) return false;
+  if (customersLoading) {
+    const currentResult = await customersLoading;
+    if (!force || !session) return currentResult;
   }
+  const loadingSession = session;
+  const loadTask = (async () => {
+    if (manager) $("#customersStatus").textContent = "Ügyféllista betöltése…";
+    try {
+      const loadedCustomers = await MunkalapDB.listCustomers(Boolean(manager));
+      if (session !== loadingSession) return false;
+      customerDirectory = loadedCustomers;
+      customersLoaded = true;
+      renderCustomers();
+      updateSuggestions();
+      if (manager) renderOffice();
+      if (manager) $("#customersStatus").textContent = "";
+      return true;
+    } catch (error) {
+      if (session !== loadingSession) return false;
+      customersLoaded = false;
+      if (manager && showErrors) $("#customersStatus").textContent = `Az ügyféllista nem tölthető be: ${error?.message || "ismeretlen hiba"}.`;
+      return false;
+    }
+  })();
+  customersLoading = loadTask;
+  try { return await loadTask; }
+  finally { if (customersLoading === loadTask) customersLoading = null; }
 }
 
 function customerInitial(name) {
@@ -1135,14 +1143,14 @@ $("#customersList").addEventListener("click", async event => {
   if (edit) openCustomerDialog(customerDirectory.find(customer => customer.id === edit.dataset.customerEdit));
   if (remove) {
     const customer = customerDirectory.find(item => item.id === remove.dataset.customerDelete);
-    if (!customer || !confirm(`Biztosan törlöd ezt az ügyfelet?\n\n${customer.fullName}\n\nAz ügyfélhez mentett helyszínek és ajánlói adatok is törlődnek. Ha munkalap vagy elszámolás kapcsolódik hozzá, a rendszer biztonságból nem engedi a törlést.`)) return;
+    if (!customer || !confirm(`Biztosan eltávolítod ezt az ügyfelet a nyilvántartásból?\n\n${customer.fullName}\n\nA korábbi munkalapok, elszámolások és kapcsolatok sértetlenül megmaradnak.`)) return;
     remove.disabled = true;
     remove.textContent = "Törlés…";
     try {
       await MunkalapDB.removeCustomer(customer.id);
       customerDirectory = customerDirectory.filter(item => item.id !== customer.id);
       renderCustomers();
-      $("#customersStatus").textContent = "Az ügyfelet töröltük.";
+      $("#customersStatus").textContent = "Az ügyfelet eltávolítottuk a nyilvántartásból.";
     } catch (error) {
       remove.disabled = false;
       remove.textContent = "Törlés";
@@ -1197,8 +1205,8 @@ $("#customerForm").addEventListener("submit", async event => {
     $("#customerSearch").value = "";
     $("#customerDialog").close();
     customersLoaded = false;
-    await loadCustomers(true, true);
-    $("#customersStatus").textContent = "Az ügyfél adatait elmentettük.";
+    const refreshed = await loadCustomers(true, true, true);
+    $("#customersStatus").textContent = refreshed ? `Az ügyfél adatait elmentettük: ${payload.fullName}.` : "Az ügyfél mentése sikerült, de a friss lista még nem tölthető be.";
   } catch (error) {
     $("#customerDialogStatus").textContent = `A mentés nem sikerült: ${error?.message || "ismeretlen hiba"}.`;
   } finally {
@@ -1619,7 +1627,7 @@ async function openApp(profile) {
   officeLoaded = false;
   officeLoading = false;
   customersLoaded = false;
-  customersLoading = false;
+  customersLoading = null;
   customerDirectory = [];
   $("#loginView").hidden = true;
   $("#appView").hidden = false;
@@ -1673,7 +1681,7 @@ async function logout() {
   officeLoaded = false;
   officeLoading = false;
   customersLoaded = false;
-  customersLoading = false;
+  customersLoading = null;
   customerDirectory = [];
   $("#appView").hidden = true;
   $("#loginView").hidden = false;
