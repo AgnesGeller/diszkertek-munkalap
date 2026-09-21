@@ -1,7 +1,7 @@
 const EMAIL_ENDPOINT = "https://formsubmit.co/ajax/info@diszkertek.hu";
 const EMAIL_RECIPIENT = "info@diszkertek.hu";
 const STABLE_APP_URL = "https://agnesgeller.github.io/diszkertek-munkalap/";
-const APP_VERSION = "59";
+const APP_VERSION = "60";
 const QUEUE_KEY = "diszkertek-munkalap-send-queue-v1";
 const MANAGER_VIEW_KEY = "diszkertek-munkalap-manager-view-v1";
 const DATABASE_FREE_LIMIT = 500 * 1024 * 1024;
@@ -1119,21 +1119,34 @@ $("#customerAlphabet").addEventListener("click", event => {
   $("#customerAlphabet").querySelector(`[data-customer-letter="${customerLetter}"]`)?.focus({ preventScroll: true });
 });
 $("#newCustomer").addEventListener("click", () => openCustomerDialog());
-$("#customerCancel").addEventListener("click", () => $("#customerDialog").close());
+function closeCustomerDialog() {
+  const dialog = $("#customerDialog");
+  if (dialog.open) dialog.close();
+  $("#customerDialogStatus").textContent = "";
+}
+$("#customerCancel").addEventListener("click", closeCustomerDialog);
+$("#customerDialogClose").addEventListener("click", closeCustomerDialog);
+$("#customerDialog").addEventListener("click", event => {
+  if (event.target === event.currentTarget) closeCustomerDialog();
+});
 $("#customersList").addEventListener("click", async event => {
   const edit = event.target.closest("[data-customer-edit]");
   const remove = event.target.closest("[data-customer-delete]");
   if (edit) openCustomerDialog(customerDirectory.find(customer => customer.id === edit.dataset.customerEdit));
   if (remove) {
     const customer = customerDirectory.find(item => item.id === remove.dataset.customerDelete);
-    if (!customer || !confirm(`Biztosan törlöd ezt az ügyfelet?\n\n${customer.fullName}\n\nHa munkalap kapcsolódik hozzá, a rendszer biztonságból nem engedi törölni; ilyenkor tedd inaktívvá.`)) return;
+    if (!customer || !confirm(`Biztosan törlöd ezt az ügyfelet?\n\n${customer.fullName}\n\nAz ügyfélhez mentett helyszínek és ajánlói adatok is törlődnek. Ha munkalap vagy elszámolás kapcsolódik hozzá, a rendszer biztonságból nem engedi a törlést.`)) return;
+    remove.disabled = true;
+    remove.textContent = "Törlés…";
     try {
       await MunkalapDB.removeCustomer(customer.id);
       customerDirectory = customerDirectory.filter(item => item.id !== customer.id);
       renderCustomers();
       $("#customersStatus").textContent = "Az ügyfelet töröltük.";
-    } catch (_) {
-      $("#customersStatus").textContent = "Ehhez az ügyfélhez már tartozik munkalap, helyszín vagy ajánlói adat. Törlés helyett kapcsold ki az Aktív ügyfél jelölést.";
+    } catch (error) {
+      remove.disabled = false;
+      remove.textContent = "Törlés";
+      $("#customersStatus").textContent = `Az ügyfél törlése nem sikerült: ${error?.message || "ismeretlen hiba"}.`;
     }
   }
 });
@@ -1238,7 +1251,7 @@ async function loadWorksheets(showErrors = true) {
 }
 
 async function loadOfficeWorksheets(showErrors = true) {
-  if (session?.role !== "manager" || officeLoading) return;
+  if (session?.role !== "manager" || officeLoading) return false;
   officeLoading = true;
   $("#officeCount").textContent = "Munkalapok betöltése…";
   showOfficeStatus("A teljes lista betöltése több részletben történik.");
@@ -1248,9 +1261,11 @@ async function loadOfficeWorksheets(showErrors = true) {
     renderAll();
     if (managerView === "customers") { renderCustomers(); $("#customersStatus").textContent = ""; }
     showOfficeStatus("A teljes irodai lista betöltve.", "success");
+    return true;
   } catch (error) {
     if (showErrors) showOfficeStatus(`A teljes lista betöltése nem sikerült: ${error?.message || "ismeretlen hiba"}.`, "error");
     if (managerView === "customers") $("#customersStatus").textContent = "A munkalapokon szereplő ajánlók nem tölthetők be. Próbáld újra később.";
+    return false;
   } finally {
     officeLoading = false;
   }

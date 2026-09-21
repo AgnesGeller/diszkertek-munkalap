@@ -605,17 +605,17 @@
       if (previewMode) {
         const index = previewCustomers.findIndex(customer => customer.id === id);
         if (index < 0) throw new Error("Az ügyfél nem található.");
+        if (previewWorksheets.some(worksheet => worksheet.customerId === id) || [...previewSettlements.values()].some(settlement => settlement.customer_id === id)) {
+          throw new Error("Ehhez az ügyfélhez már munkalap vagy elszámolás tartozik. Törlés helyett állítsd inaktívra.");
+        }
         previewCustomers.splice(index, 1);
         return id;
       }
-      const { data, error } = await client
-        .from("customers")
-        .delete()
-        .eq("id", id)
-        .select("id")
-        .single();
+      const { data, error } = await client.rpc("delete_customer_as_manager", {
+        p_customer_id: id
+      });
       if (error) throw error;
-      return data.id;
+      return data;
     },
 
     async remove(id) {
