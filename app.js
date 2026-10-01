@@ -1,7 +1,7 @@
-const EMAIL_ENDPOINT = "https://formsubmit.co/ajax/info@diszkertek.hu";
+const EMAIL_ENDPOINT = "https://formsubmit.co/info@diszkertek.hu";
 const EMAIL_RECIPIENT = "info@diszkertek.hu";
 const STABLE_APP_URL = "https://agnesgeller.github.io/diszkertek-munkalap/";
-const APP_VERSION = "62";
+const APP_VERSION = "63";
 const QUEUE_KEY = "diszkertek-munkalap-send-queue-v1";
 const MANAGER_VIEW_KEY = "diszkertek-munkalap-manager-view-v1";
 const DATABASE_FREE_LIMIT = 500 * 1024 * 1024;
@@ -235,27 +235,57 @@ function fallbackEmailUrl(payload) {
 
 async function sendEmail(payload) {
   if (LOCAL_PREVIEW) return;
-  const formBody = new URLSearchParams();
-  Object.entries(payload || {}).forEach(([name, value]) => formBody.append(name, String(value ?? "")));
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 12000);
-  let response;
-  try {
-    response = await fetch(EMAIL_ENDPOINT, {
-      method: "POST",
-      headers: { "Accept": "application/json" },
-      body: formBody,
-      signal: controller.signal
+  await new Promise((resolve, reject) => {
+    const token = uuid();
+    const frame = document.createElement("iframe");
+    const formElement = document.createElement("form");
+    const frameName = `munkalap-email-${token}`;
+    let finished = false;
+    let timeout;
+    const cleanup = () => {
+      clearTimeout(timeout);
+      frame.remove();
+      formElement.remove();
+    };
+    const finish = callback => {
+      if (finished) return;
+      finished = true;
+      cleanup();
+      callback();
+    };
+    frame.name = frameName;
+    frame.hidden = true;
+    frame.title = "Munkalap e-mail-küldés";
+    frame.addEventListener("load", () => {
+      try {
+        const resultUrl = new URL(frame.contentWindow.location.href);
+        const expectedPath = new URL("email-sent.html", STABLE_APP_URL).pathname;
+        if (resultUrl.origin === location.origin && resultUrl.pathname === expectedPath && resultUrl.searchParams.get("token") === token) {
+          finish(resolve);
+        }
+      } catch (_) {
+        // A FormSubmit oldal más eredetű; csak a saját sikeroldalra visszatérés igazolja a küldést.
+      }
     });
-  } catch (error) {
-    if (error?.name === "AbortError") throw new Error("Az automatikus e-mail-küldés túl sokáig várakozott.");
-    throw error;
-  } finally {
-    clearTimeout(timeout);
-  }
-  const result = await response.json().catch(() => ({}));
-  const explicitlyFailed = result.success === false || String(result.success).toLowerCase() === "false";
-  if (!response.ok || explicitlyFailed) throw new Error(result.message || `Küldési hiba (${response.status})`);
+    formElement.method = "POST";
+    formElement.action = EMAIL_ENDPOINT;
+    formElement.target = frameName;
+    formElement.hidden = true;
+    const fields = {
+      ...(payload || {}),
+      _next: new URL(`email-sent.html?token=${encodeURIComponent(token)}`, STABLE_APP_URL).href
+    };
+    Object.entries(fields).forEach(([name, value]) => {
+      const input = document.createElement("input");
+      input.type = "hidden";
+      input.name = name;
+      input.value = String(value ?? "");
+      formElement.append(input);
+    });
+    document.body.append(frame, formElement);
+    timeout = setTimeout(() => finish(() => reject(new Error("A FormSubmit nem igazolta vissza az e-mail elküldését."))), 30000);
+    formElement.submit();
+  });
 }
 
 function showStatus(message, kind = "error") {
@@ -384,6 +414,24 @@ function makeQueueItem(action, record, emailPayload, databaseSaved = false) {
   };
 }
 
+function clearEmailFallbackStatus(record) {
+  const status = record?.data?._officeStatus;
+  if (status === "email_fallback") delete record.data._officeStatus;
+  else if (status === "database_delayed_email_fallback") record.data._officeStatus = "database_delayed";
+  else return false;
+  return true;
+}
+
+function markQueueEmailHandledManually(queueId) {
+  const queue = readQueue();
+  const item = queue.find(entry => entry.queueId === queueId);
+  if (!item) return;
+  item.emailHandledManually = true;
+  delete item.emailError;
+  if (clearEmailFallbackStatus(item.record) && item.databaseSaved) item.statusUpdatePending = true;
+  writeQueue(queue);
+}
+
 async function syncQueue() {
   if (queueSyncRunning || !session || !navigator.onLine) return false;
   queueSyncRunning = true;
@@ -421,7 +469,17 @@ async function syncQueue() {
         try {
           await sendEmail(item.emailPayload);
           item.emailSent = true;
+          delete item.emailError;
           changed = true;
+          if (clearEmailFallbackStatus(item.record) && item.databaseSaved) {
+            item.statusUpdatePending = true;
+            try {
+              await withTimeout(MunkalapDB.update(item.record.id, item.record), 12000, "A figyelmeztetés törlése túl sokáig várakozott.");
+              item.statusUpdatePending = false;
+            } catch (error) {
+              item.lastError = error?.message || "A figyelmeztetés törlése nem sikerült";
+            }
+          }
         } catch (error) {
           item.emailError = error?.message || "E-mail-küldési hiba";
         }
@@ -637,9 +695,15 @@ function finishExternalEmail() {
   $("#fallbackConfirmDialog").showModal();
 }
 
-$("#fallbackSent").addEventListener("click", () => {
+$("#fallbackSent").addEventListener("click", async () => {
   const context = fallbackEmailContext;
-  if (context?.queueId) updateQueueItem(context.queueId, { emailHandledManually: true });
+  if (context?.worksheetId) {
+    $("#fallbackConfirmDialog").close();
+    fallbackEmailContext = null;
+    await clearWorksheetEmailWarning(context.worksheetId);
+    return;
+  }
+  if (context?.queueId) markQueueEmailHandledManually(context.queueId);
   $("#fallbackConfirmDialog").close();
   fallbackEmailContext = null;
   resetForm();
@@ -648,7 +712,14 @@ $("#fallbackSent").addEventListener("click", () => {
 });
 
 $("#fallbackNotSent").addEventListener("click", () => {
+  const context = fallbackEmailContext;
   $("#fallbackConfirmDialog").close();
+  if (context?.worksheetId) {
+    fallbackEmailContext = null;
+    fallbackEmailButton.hidden = true;
+    showOfficeStatus("Az e-mail újraküldését nem jelöltük sikeresnek. A munkalapnál továbbra is látszik a figyelmeztetés.", "error");
+    return;
+  }
   fallbackEmailButton.hidden = false;
   showStatus("Az e-mail nem lett elküldve. Nyomd meg újra a „Küldés e-mail alkalmazással” gombot.", "pending");
   syncQueue();
@@ -726,9 +797,10 @@ function worksheetCardHTML(item, office = false) {
   const rentals = filledRentals(data);
   const officeStatus = {
     database_delayed: "Az adatbázis-mentés csak késleltetett újrapróbálással sikerült.",
-    email_fallback: "Az automatikus e-mail-küldés elsőre nem sikerült.",
-    database_delayed_email_fallback: "Az adatbázis-mentés késett, és az automatikus e-mail-küldés sem sikerült elsőre."
+    email_fallback: "Az automatikus e-mail-küldés nem sikerült, és még nincs rögzítve sikeres újraküldés.",
+    database_delayed_email_fallback: "Az adatbázis-mentés késett, az e-mail-küldés pedig még nincs sikeresként rögzítve."
   }[data._officeStatus];
+  const hasEmailWarning = ["email_fallback", "database_delayed_email_fallback"].includes(data._officeStatus);
   const canManagePending = session?.role === "manager" || Boolean(session?.delegatedBy);
   return `
     <article class="worksheet-card" data-id="${escapeHTML(item.id)}">
@@ -747,6 +819,7 @@ function worksheetCardHTML(item, office = false) {
         ${item.pending ? (canManagePending ? `<button class="delete-button" type="button" data-cancel-queue="${escapeHTML(item.pendingQueueId)}">Várakozó példány törlése</button>` : "") : `<button type="button" data-edit="${escapeHTML(item.id)}">Megnyitás / Szerkesztés</button>`}
         ${office ? `<button type="button" data-print="${escapeHTML(item.id)}">PDF / Nyomtatás</button>` : ""}
         ${office && !item.pending ? `<button class="budget-tab" type="button" data-budget="${escapeHTML(item.id)}">Elszámolás</button>` : ""}
+        ${office && hasEmailWarning && !item.pending ? `<button type="button" data-resend-email="${escapeHTML(item.id)}">E-mail újraküldése</button>` : ""}
         ${(office || session?.role === "manager") && !item.pending ? `<button class="delete-button" type="button" data-delete="${escapeHTML(item.id)}">Munkalap törlése</button>` : ""}
       </div>
     </article>`;
@@ -1334,11 +1407,37 @@ $("#officeWorksheets").addEventListener("click", async event => {
   const print = event.target.closest("[data-print]");
   const remove = event.target.closest("[data-delete]");
   const budget = event.target.closest("[data-budget]");
+  const resendEmail = event.target.closest("[data-resend-email]");
   if (budget) { await setManagerView("budget"); if (managerView === "budget") await window.Billing?.open(budget.dataset.budget); }
   if (edit) openWorksheetForEdit(edit.dataset.edit);
   if (print) printWorksheet(print.dataset.print);
+  if (resendEmail) resendWorksheetEmail(resendEmail.dataset.resendEmail);
   if (remove) deleteWorksheet(remove.dataset.delete, remove);
 });
+
+function resendWorksheetEmail(id) {
+  if (session?.role !== "manager") return;
+  const item = worksheets.find(worksheet => worksheet.id === id);
+  if (!item) return;
+  fallbackEmailContext = { payload: buildEmailPayload(item.data || {}, false), worksheetId: id, clearAfterReturn: false };
+  externalEmailInProgress = true;
+  window.location.href = fallbackEmailUrl(fallbackEmailContext.payload);
+}
+
+async function clearWorksheetEmailWarning(id) {
+  if (session?.role !== "manager") return;
+  const item = worksheets.find(worksheet => worksheet.id === id);
+  if (!item) return;
+  const updated = { ...item, data: { ...(item.data || {}) } };
+  if (!clearEmailFallbackStatus(updated)) return;
+  try {
+    const saved = await MunkalapDB.update(id, updated);
+    updateWorksheetCache(saved);
+    showOfficeStatus("Az e-mail újraküldését rögzítettük, a figyelmeztetést töröltük.", "success");
+  } catch (error) {
+    showOfficeStatus(`Az újraküldés megtörtént, de a figyelmeztetés nem törölhető: ${error?.message || "ismeretlen hiba"}.`, "error");
+  }
+}
 
 async function deleteWorksheet(id, button) {
   if (session?.role !== "manager") return;

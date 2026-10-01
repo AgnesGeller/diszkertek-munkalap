@@ -52,6 +52,10 @@ renderReferrers();
 assert.equal(box.open, false);
 
 const changedWorksheet = { ...worksheet, updatedAt: worksheet.updatedAt, data: { team_1_size: '2', team_1_arrival: '08:00', team_1_departure: '10:00' } };
+const metadataOnlyWorksheet = { ...worksheet, data: { team_1_size: '1', team_1_arrival: '08:00', team_1_departure: '09:00', _officeStatus: 'email_fallback' } };
+setWorksheets([metadataOnlyWorksheet]);
+setDraft({ customer_id: customerId, customer_name: 'Teszt', worksheet_ids: [worksheet.id], source_snapshots: [{ worksheetId: worksheet.id, worksheetUpdatedAt: worksheet.updatedAt, customer: worksheet.customer, customerId, date: worksheet.date, data: { team_1_size: '1', team_1_arrival: '08:00', team_1_departure: '09:00' } }], period_start: worksheet.date, period_end: worksheet.date, status: 'ready', items: [{ label: 'Munkadíj', quantity: '60', unit: 'főperc', unitPrice: '12000', divisor: 60, reviewed: true }] });
+assert.equal(refreshChangedWorksheets(), 0, 'Az irodai technikai figyelmeztetés változása nem módosíthatja az elszámolást.');
 setWorksheets([changedWorksheet]);
 setPrices([{ code: 'labor', label: 'Munkadíj', unit_price: 12000, confirmed: true }]);
 setDraft({ customer_id: customerId, customer_name: 'Teszt', worksheet_ids: [worksheet.id], source_snapshots: [{ worksheetId: worksheet.id, worksheetUpdatedAt: worksheet.updatedAt, customer: worksheet.customer, date: worksheet.date, data: { team_1_size: '1', team_1_arrival: '08:00', team_1_departure: '09:00' } }], period_start: worksheet.date, period_end: worksheet.date, status: 'ready', items: [{ label: 'Régi munkadíj', quantity: '60', unit: 'főperc', unitPrice: '12000', divisor: 60, reviewed: true }] });
