@@ -1,0 +1,7 @@
+.quote-project-tracking{margin:1rem 0;padding:1rem;border:1px solid #b3c5b3;background:#f5f8f3}
+.quote-project-tracking[hidden]{display:none}
+.quote-project-tracking label{display:block;margin:.8rem 0;overflow-wrap:anywhere}
+.quote-project-tracking select{display:block;width:100%;min-height:44px;margin-top:.4rem}
+.quote-project-tracking progress{display:block;width:100%;height:1.2rem;margin:.5rem 0;accent-color:#466e43}
+.quote-project-tracking span{display:block}
+.quote-project-tracking button{min-height:44px;white-space:normal}

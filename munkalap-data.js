@@ -204,6 +204,13 @@
   }
 
   window.MunkalapDB = {
+    async projectAccessToken() {
+      if (previewMode || !client) return null;
+      const { data, error } = await client.auth.getSession();
+      if (error) return null;
+      return data.session?.access_token || null;
+    },
+
     configured,
     previewMode,
 
