@@ -1,0 +1,22 @@
+<!doctype html><html lang="hu"><meta charset="utf-8"><h1>Munkalap ügyfélváltás ellenőrzése</h1><pre id="result"></pre><script>
+(async()=>{
+const source=await (await fetch('../app.js?v=66')).text();
+const helper=source.slice(source.indexOf('function separateWorksheetIdentity() {'),source.indexOf('function worksheetFromForm(existing) {'));
+const run=new Function('f',`let editingId='old',pendingCurrentQueueId=null,worksheetReturnView='office',selectedCustomerId='a',selectedLocationId='old-location',formDirty=false;
+const worksheets=[{id:'old',customerId:'a',customer:'Teszt A',address:'Teszt utca 1',data:{description:'Korábbi munka'}}];
+const before=JSON.stringify(worksheets),customerDirectory=[{id:'a',fullName:'Teszt A',locations:[{id:'loc-a',address:'Teszt utca 1'},{id:'loc-a2',address:'Teszt utca 2'}]},{id:'b',fullName:'Teszt B',locations:[{id:'loc-b',address:'Másik utca 1'}]}];
+const button={textContent:'Módosítás mentése'},cancel={hidden:false},session={name:'Ági'};
+const form={elements:{customerName:{value:f.name},address:{value:f.address},description:{value:f.description??'Korábbi munka'},quote_project_id:{value:'old-project'},teamLeader:{value:'Tamás'}},querySelector:()=>button};
+const $=()=>cancel,showStatus=()=>{},searchKey=v=>String(v||'').trim().replace(/\\s+/g,' ').toLowerCase(),customerNameKey=searchKey;
+${helper}
+const changed=separateWorksheetIdentity();return {changed,editingId,description:form.elements.description.value,project:form.elements.quote_project_id.value,selectedCustomerId,selectedLocationId,unchanged:before===JSON.stringify(worksheets),submit:button.textContent,cancelHidden:cancel.hidden};`);
+const checks={};let r=run({name:'Teszt B',address:'Másik utca 1'});
+checks.new_customer_new_worksheet=r.changed&&r.editingId===null&&r.selectedCustomerId==='b'&&r.selectedLocationId==='loc-b';
+checks.previous_description_removed=r.description==='';checks.previous_project_removed=r.project==='';checks.saved_worksheet_unchanged=r.unchanged;
+checks.same_customer_second_address=run({name:'Teszt A',address:'Teszt utca 2'}).editingId===null;
+checks.same_identity_preserves_edit=run({name:' teszt a ',address:'Teszt utca 1'}).editingId==='old';
+checks.new_description_preserved=run({name:'Teszt B',address:'Másik utca 1',description:'Új munka'}).description==='Új munka';
+checks.empty_input_not_new_record=run({name:'',address:'Teszt utca 1'}).editingId==='old';
+checks.new_submit_caption=r.submit==='Munkalap elküldése'&&r.cancelHidden;
+document.querySelector('#result').textContent=JSON.stringify(checks,null,2);
+})();</script></html>

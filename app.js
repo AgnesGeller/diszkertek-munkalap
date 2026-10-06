@@ -1,7 +1,7 @@
 const EMAIL_ENDPOINT = "https://formsubmit.co/info@diszkertek.hu";
 const EMAIL_RECIPIENT = "info@diszkertek.hu";
 const STABLE_APP_URL = "https://agnesgeller.github.io/diszkertek-munkalap/";
-const APP_VERSION = "65";
+const APP_VERSION = "66";
 const QUEUE_KEY = "diszkertek-munkalap-send-queue-v1";
 const MANAGER_VIEW_KEY = "diszkertek-munkalap-manager-view-v1";
 const DATABASE_FREE_LIMIT = 500 * 1024 * 1024;
@@ -555,6 +555,34 @@ function validateTeamRows() {
   return false;
 }
 
+function separateWorksheetIdentity() {
+  if (!editingId || pendingCurrentQueueId) return false;
+  const original = worksheets.find(item => item.id === editingId);
+  if (!original) return false;
+  const name = form.elements.customerName.value.trim();
+  const address = form.elements.address.value.trim();
+  if (!name || !address) return false;
+  const customer = customerDirectory.find(item => customerNameKey(item.fullName) === customerNameKey(name));
+  const sameCustomer = customer && original.customerId
+    ? customer.id === original.customerId
+    : customerNameKey(name) === customerNameKey(original.customer);
+  if (sameCustomer && searchKey(address) === searchKey(original.address)) return false;
+  if (form.elements.description.value === String(original.data?.description || "")) {
+    form.elements.description.value = "";
+  }
+  if (form.elements.quote_project_id) form.elements.quote_project_id.value = "";
+  editingId = null;
+  worksheetReturnView = "";
+  selectedCustomerId = customer?.id || null;
+  selectedLocationId = customer?.locations?.find(item => searchKey(item.address) === searchKey(address))?.id || null;
+  form.elements.teamLeader.value = session?.name || "";
+  form.querySelector(".submit-button").textContent = "Munkalap elküldése";
+  $("#cancelEdit").hidden = true;
+  formDirty = true;
+  showStatus("Másik ügyfél vagy cím: új munkalap. A korábbi mentett munkalap megmaradt.", "success");
+  return true;
+}
+
 function worksheetFromForm(existing) {
   const data = formDataObject();
   const customer = customerDirectory.find(item => customerNameKey(item.fullName) === customerNameKey(data.customerName));
@@ -587,6 +615,7 @@ function updateWorksheetCache(saved) {
 
 form.addEventListener("submit", async event => {
   event.preventDefault();
+  separateWorksheetIdentity();
   if (!session || !form.reportValidity() || !validateTeamRows()) return;
   if (pendingCurrentQueueId) {
     showStatus("Ez a munkalap már küldésre vár. Nem mentettük el még egyszer.", "pending");
@@ -991,6 +1020,14 @@ function updateSuggestions() {
   addressInput.onfocus = () => showCustomerSuggestions($("#addressSuggestions"), customerMatches(addressInput.value, true));
 }
 
+let identityChangeTimer;
+function scheduleWorksheetIdentityCheck() {
+  clearTimeout(identityChangeTimer);
+  identityChangeTimer = setTimeout(separateWorksheetIdentity, 250);
+}
+form.elements.customerName.addEventListener("change", scheduleWorksheetIdentityCheck);
+form.elements.address.addEventListener("change", scheduleWorksheetIdentityCheck);
+
 function chooseCustomerSuggestion(button) {
   selectedCustomerId = button.dataset.customerId || null;
   selectedLocationId = button.dataset.locationId || null;
@@ -1000,6 +1037,7 @@ function chooseCustomerSuggestion(button) {
   form.elements.referrerNames.value = customer?.referrerNames || (customer?.referrers || []).filter(item => item.active).map(item => item.fullName).join(", ");
   hideCustomerSuggestions($("#customerSuggestions"));
   hideCustomerSuggestions($("#addressSuggestions"));
+  separateWorksheetIdentity();
   formDirty = true;
 }
 

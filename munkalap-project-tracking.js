@@ -15,7 +15,7 @@
     const current=typeof session==='undefined'?null:session;
     const customers=typeof customerDirectory==='undefined'?[]:customerDirectory;
     const selected=typeof selectedCustomerId==='undefined'?null:selectedCustomerId;
-    const customer=customers.find(c=>c.id===selected)||customers.find(c=>normalize(c.fullName)===normalize(form.elements.customerName.value));
+    const customer=customers.find(c=>c.id===selected&&normalize(c.fullName)===normalize(form.elements.customerName.value))||customers.find(c=>normalize(c.fullName)===normalize(form.elements.customerName.value));
     return {signedIn:Boolean(current),customer_id:customer?.id,address:form.elements.address.value,
       work_date:typeof toDateInputValue==='function'?toDateInputValue(form.elements.date.value):null,
       preset_id:typeof editingId==='undefined'||!editingId?null:(typeof worksheets==='undefined'?[]:worksheets).find(r=>r.id===editingId)?.data?.quote_project_id};
@@ -44,7 +44,7 @@
       const token=await window.MunkalapDB?.projectAccessToken?.();if(!token)return;
       const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action:'worker_state',customer_id:c.customer_id,address:c.address,work_date:c.work_date}),signal:AbortSignal.timeout(30000)});
       if(!response.ok)throw Error('A projektadatok most nem frissíthetők.');
-      const data=await response.json();if(requestGeneration!==generation)return;
+      const data=await response.json();if(requestGeneration!==generation||JSON.stringify(context())!==key)return;
       projects=data.projects||[];if(c.preset_id&&projects.some(p=>p.id===c.preset_id))hidden.value=c.preset_id;render();
     }catch{
       if(requestGeneration!==generation)return;
@@ -52,7 +52,11 @@
       if(!section.hidden){let p=section.querySelector('[data-project-error]');if(!p){p=document.createElement('p');p.dataset.projectError='';section.append(p);}p.textContent='A projektadatok most nem frissíthetők. A munkalap továbbra is elküldhető.';}
     }finally{busy=false;}
   }
-  let timer;form.addEventListener('input',()=>{clearTimeout(timer);timer=setTimeout(()=>refresh(),500);});
+  let timer;form.addEventListener('input',event=>{
+    if(['customerName','address','date'].includes(event.target.name)){generation++;lastKey='';lastRefresh=0;projects=[];hidden.value='';render();}
+    clearTimeout(timer);timer=setTimeout(()=>refresh(),500);
+  });
+  form.addEventListener('change',event=>{if(['customerName','address','date'].includes(event.target.name)){clearTimeout(timer);refresh();}});
   form.addEventListener('reset',()=>{lastKey='';lastRefresh=0;setTimeout(()=>refresh(),0);});
   document.addEventListener('click',e=>{if(e.target.closest('#customerSuggestions,#addressSuggestions')){lastRefresh=0;setTimeout(()=>refresh(),0);}});
   const interval=setInterval(()=>{const c=context();if(JSON.stringify(c)!==lastKey)lastRefresh=0;refresh();},5000);
