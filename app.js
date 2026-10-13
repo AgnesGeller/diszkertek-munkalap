@@ -1,7 +1,7 @@
 const EMAIL_ENDPOINT = "https://formsubmit.co/info@diszkertek.hu";
 const EMAIL_RECIPIENT = "info@diszkertek.hu";
 const STABLE_APP_URL = "https://agnesgeller.github.io/diszkertek-munkalap/";
-const APP_VERSION = "70";
+const APP_VERSION = "71";
 const QUEUE_KEY = "diszkertek-munkalap-send-queue-v1";
 const MANAGER_VIEW_KEY = "diszkertek-munkalap-manager-view-v1";
 const DATABASE_FREE_LIMIT = 500 * 1024 * 1024;
@@ -1212,6 +1212,7 @@ function renderCustomers() {
   $("#customersList").innerHTML = filtered.length ? filtered.map(customer => `
     <article class="customer-card">
       <header><div><h3>${escapeHTML(customer.fullName)}${customer.isNew ? ' <span title="Új ügyfél" aria-label="Új ügyfél">!</span>' : ""}</h3><div class="customer-meta">
+        ${customer.reviewStatus === "approved" ? "" : `<span class="customer-badge hidden-customer">Rejtett</span>`}
         ${customer.active ? "" : `<span class="customer-badge inactive">Inaktív</span>`}
       </div></div><button type="button" data-customer-edit="${escapeHTML(customer.id)}">Szerkesztés</button></header>
       ${(customer.locations || []).some(location => location.active !== false) ? `<p><b>Helyszínek:</b> ${(customer.locations || []).filter(location => location.active !== false).map(location => escapeHTML(location.address)).join(" · ")}</p>` : `<p><b>Helyszín:</b> még nincs megadva</p>`}
@@ -1234,7 +1235,7 @@ function openCustomerDialog(customer = null) {
   customerForm.elements.billingMode.value = customer?.billingMode || "per_job";
   customerForm.elements.locations.value = (customer?.locations || []).filter(location => location.active !== false).map(location => location.address).join("\n");
   customerForm.elements.notes.value = customer?.notes || "";
-  customerForm.elements.approved.checked = customer?.reviewStatus === "approved";
+  customerForm.elements.hiddenCustomer.checked = customer ? customer.reviewStatus !== "approved" : false;
   customerForm.elements.active.checked = customer?.active !== false;
   renderCustomerReferrers(customer);
   $("#customerDialogTitle").textContent = customer ? "Ügyfél szerkesztése" : "Új ügyfél";
@@ -1361,7 +1362,7 @@ $("#customerForm").addEventListener("submit", async event => {
   const addresses = String(customerForm.elements.locations.value || "").split(/\r?\n/).map(value => value.trim()).filter(Boolean);
   const locations = addresses.map(address => {
     const saved = existing?.locations?.find(location => searchKey(location.address) === searchKey(address));
-    return { id: saved?.id, address, label: saved?.label || "", active: true, reviewStatus: customerForm.elements.approved.checked ? "approved" : "pending" };
+    return { id: saved?.id, address, label: saved?.label || "", active: true, reviewStatus: customerForm.elements.hiddenCustomer.checked ? "pending" : "approved" };
   });
   const referrers = [...$("#customerReferrerRows").querySelectorAll(".customer-referrer-row")].map(row => ({
     id: row.dataset.referrerId || null,
@@ -1384,7 +1385,7 @@ $("#customerForm").addEventListener("submit", async event => {
     taxNumber: customerForm.elements.taxNumber.value.trim(),
     billingMode: customerForm.elements.billingMode.value,
     notes: customerForm.elements.notes.value.trim(),
-    reviewStatus: customerForm.elements.approved.checked ? "approved" : "pending",
+    reviewStatus: customerForm.elements.hiddenCustomer.checked ? "pending" : "approved",
     active: customerForm.elements.active.checked,
     locations,
     referrers: referrers.map(({ fromWorksheet, ...referrer }) => referrer),
