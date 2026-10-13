@@ -1,7 +1,7 @@
 const EMAIL_ENDPOINT = "https://formsubmit.co/info@diszkertek.hu";
 const EMAIL_RECIPIENT = "info@diszkertek.hu";
 const STABLE_APP_URL = "https://agnesgeller.github.io/diszkertek-munkalap/";
-const APP_VERSION = "67";
+const APP_VERSION = "69";
 const QUEUE_KEY = "diszkertek-munkalap-send-queue-v1";
 const MANAGER_VIEW_KEY = "diszkertek-munkalap-manager-view-v1";
 const DATABASE_FREE_LIMIT = 500 * 1024 * 1024;
@@ -183,7 +183,8 @@ function renderItems(targetId, prefix, list) {
       return `<fieldset class="material-other-row">
         <legend>${index + 1}. ${escapeHTML(displayName)}</legend>
         <label><span>Megnevezés</span><input name="${fieldName}" autocomplete="off" maxlength="160" aria-label="${escapeHTML(displayName)} megnevezése"></label>
-        <label><span>Mennyiség</span><input name="${fieldName}_quantity" inputmode="decimal" maxlength="20" aria-label="${escapeHTML(displayName)} mennyisége"></label>
+        <label><span>Mennyiség</span><input name="${fieldName}_quantity" type="text" inputmode="decimal" pattern="[0-9]+([,.][0-9]{1,3})?" maxlength="20" placeholder="pl. 1,5" title="Egész vagy legfeljebb három tizedesjegyű szám" aria-label="${escapeHTML(displayName)} mennyisége"></label>
+        <label><span>Mértékegység</span><input name="${fieldName}_unit" autocomplete="off" maxlength="40" placeholder="pl. db, m², óra" aria-label="${escapeHTML(displayName)} mértékegysége"></label>
         <label><span>Ár (Ft)</span><input name="${fieldName}_price" inputmode="decimal" maxlength="20" aria-label="${escapeHTML(displayName)} ára forintban"></label>
       </fieldset>`;
     }
@@ -206,6 +207,7 @@ function otherItemValues(data, prefix, index) {
   return {
     name: String(data[key] || "").trim(),
     quantity: String(data[`${key}_quantity`] || "").trim(),
+    unit: String(data[`${key}_unit`] || "").trim(),
     price: String(data[`${key}_price`] || "").trim()
   };
 }
@@ -216,13 +218,13 @@ function addMaterialToEmail(payload, section, prefix, name, unit, index, data) {
     return;
   }
   const item = otherItemValues(data, prefix, index);
-  if (!item.name && !item.quantity && !item.price) return;
+  if (!item.name && !item.quantity && !item.unit && !item.price) return;
   const displayName = item.name || name.replace(/(\D)(\d+)$/, "$1 $2");
   if (!item.quantity && !item.price) {
     addIfFilled(payload, `${section} – ${name}`, item.name);
     return;
   }
-  payload[`${section} – ${displayName}`] = `Mennyiség: ${item.quantity || "—"} | Ár: ${item.price ? `${item.price} Ft` : "—"}`;
+  payload[`${section} – ${displayName}`] = `Mennyiség: ${item.quantity || "—"}${item.unit ? ` ${item.unit}` : ""} | Ár: ${item.price ? `${item.price} Ft` : "—"}`;
 }
 
 function buildEmailPayload(data, modified = false) {
@@ -591,13 +593,14 @@ function validateTeamRows() {
 function validateOtherItems() {
   let firstInvalid = null;
   for (const row of form.querySelectorAll(".material-other-row")) {
-    const name = row.querySelector('input[name]:not([name$="_quantity"]):not([name$="_price"])');
+    const name = row.querySelector('input[name]:not([name$="_quantity"]):not([name$="_unit"]):not([name$="_price"])');
     const quantity = row.querySelector('input[name$="_quantity"]');
+    const unit = row.querySelector('input[name$="_unit"]');
     const price = row.querySelector('input[name$="_price"]');
-    for (const field of [name, quantity, price]) field.setCustomValidity("");
-    const hasAnyValue = Boolean(name.value.trim() || quantity.value.trim() || price.value.trim());
+    for (const field of [name, quantity, unit, price]) field.setCustomValidity("");
+    const hasAnyValue = Boolean(name.value.trim() || quantity.value.trim() || unit.value.trim() || price.value.trim());
     if (!hasAnyValue) continue;
-    if (name.value.trim() && !quantity.value.trim() && !price.value.trim()) continue;
+    if (name.value.trim() && !quantity.value.trim() && !unit.value.trim() && !price.value.trim()) continue;
     if (!name.value.trim()) {
       name.setCustomValidity("Add meg az Egyéb tétel megnevezését.");
       firstInvalid ||= name;
@@ -607,6 +610,10 @@ function validateOtherItems() {
       quantity.setCustomValidity("Adj meg 0-nál nagyobb, legfeljebb három tizedesjegyű mennyiséget.");
       firstInvalid ||= quantity;
     }
+    if (!unit.value.trim()) {
+      unit.setCustomValidity("Add meg az Egyéb tétel mértékegységét.");
+      firstInvalid ||= unit;
+    }
     const priceText = price.value.trim().replace(",", ".");
     if (!/^\d+(?:\.\d{1,2})?$/.test(priceText) || Number(priceText) < 0 || Number(priceText) > 100000000) {
       price.setCustomValidity("Adj meg érvényes árat, legfeljebb két tizedesjeggyel.");
@@ -615,7 +622,7 @@ function validateOtherItems() {
   }
   if (!firstInvalid) return true;
   firstInvalid.reportValidity();
-  showStatus("Az Egyéb tételnél töltsd ki a megnevezést, a mennyiséget és az árat.");
+  showStatus("Az Egyéb tételnél töltsd ki a megnevezést, a mennyiséget, a mértékegységet és az árat.");
   return false;
 }
 
@@ -866,9 +873,9 @@ function filledMaterialItems(data) {
     const value = String(data[`maintenance_${index}`] || "").trim();
     if (name.startsWith("Egyéb")) {
       const item = otherItemValues(data, "maintenance", index);
-      if (item.name || item.quantity || item.price) {
-        if (!item.quantity && !item.price) result.push(`${name.replace(/(\D)(\d+)$/, "$1 $2")}: ${item.name}`);
-        else result.push(`${item.name || name.replace(/(\D)(\d+)$/, "$1 $2")} · Mennyiség: ${item.quantity || "—"} · Ár: ${item.price ? `${item.price} Ft` : "—"}`);
+      if (item.name || item.quantity || item.unit || item.price) {
+        if (!item.quantity && !item.unit && !item.price) result.push(`${name.replace(/(\D)(\d+)$/, "$1 $2")}: ${item.name}`);
+        else result.push(`${item.name || name.replace(/(\D)(\d+)$/, "$1 $2")} · Mennyiség: ${item.quantity || "—"}${item.unit ? ` ${item.unit}` : ""} · Ár: ${item.price ? `${item.price} Ft` : "—"}`);
       }
     } else if (value) result.push(`${name}: ${value}${unit ? ` ${unit}` : ""}`);
   });
@@ -876,9 +883,9 @@ function filledMaterialItems(data) {
     const value = String(data[`construction_${index}`] || "").trim();
     if (name.startsWith("Egyéb")) {
       const item = otherItemValues(data, "construction", index);
-      if (item.name || item.quantity || item.price) {
-        if (!item.quantity && !item.price) result.push(`${name.replace(/(\D)(\d+)$/, "$1 $2")}: ${item.name}`);
-        else result.push(`${item.name || name.replace(/(\D)(\d+)$/, "$1 $2")} · Mennyiség: ${item.quantity || "—"} · Ár: ${item.price ? `${item.price} Ft` : "—"}`);
+      if (item.name || item.quantity || item.unit || item.price) {
+        if (!item.quantity && !item.unit && !item.price) result.push(`${name.replace(/(\D)(\d+)$/, "$1 $2")}: ${item.name}`);
+        else result.push(`${item.name || name.replace(/(\D)(\d+)$/, "$1 $2")} · Mennyiség: ${item.quantity || "—"}${item.unit ? ` ${item.unit}` : ""} · Ár: ${item.price ? `${item.price} Ft` : "—"}`);
       }
     } else if (value) result.push(`${name}: ${value}${unit ? ` ${unit}` : ""}`);
   });

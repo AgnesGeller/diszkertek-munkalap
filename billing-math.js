@@ -35,13 +35,13 @@
     }
     const customCodesInUse=new Set();
     for(const code of customItemCodes){
-      const label=String(data[code]||'').trim(),quantityText=String(data[code+'_quantity']||'').trim(),priceText=String(data[code+'_price']||'').trim();
-      if(!quantityText&&!priceText) continue;
+      const label=String(data[code]||'').trim(),quantityText=String(data[code+'_quantity']||'').trim(),unit=String(data[code+'_unit']||'').trim(),priceText=String(data[code+'_price']||'').trim();
+      if(!quantityText&&!unit&&!priceText) continue;
       customCodesInUse.add(code);
-      let quantity='0',unitPrice='0',valid=Boolean(label);
+      let quantity='0',unitPrice='0',valid=Boolean(label&&unit);
       try{quantity=decimal(quantityText,3,1000000);valid=valid&&Number(quantity)>0;}catch(_){valid=false;}
       try{unitPrice=decimal(priceText,2,100000000);}catch(_){valid=false;}
-      result.push({label:label||'Egyéb tétel – hiányzó megnevezés',quantity,unit:'tétel',unitPrice,divisor:1,reviewed:false,customItemValid:valid});
+      result.push({label:label||'Egyéb tétel – hiányzó megnevezés',quantity,unit:unit||'tétel',unitPrice,divisor:1,reviewed:false,customItemValid:valid});
     }
     for(const price of prices){
       if(price.code==='labor') continue;
