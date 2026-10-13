@@ -1,7 +1,7 @@
 const EMAIL_ENDPOINT = "https://formsubmit.co/info@diszkertek.hu";
 const EMAIL_RECIPIENT = "info@diszkertek.hu";
 const STABLE_APP_URL = "https://agnesgeller.github.io/diszkertek-munkalap/";
-const APP_VERSION = "69";
+const APP_VERSION = "70";
 const QUEUE_KEY = "diszkertek-munkalap-send-queue-v1";
 const MANAGER_VIEW_KEY = "diszkertek-munkalap-manager-view-v1";
 const DATABASE_FREE_LIMIT = 500 * 1024 * 1024;
@@ -1211,7 +1211,7 @@ function renderCustomers() {
   $("#customersCount").textContent = `${filtered.length} / ${customerDirectory.length} ügyfél`;
   $("#customersList").innerHTML = filtered.length ? filtered.map(customer => `
     <article class="customer-card">
-      <header><div><h3>${escapeHTML(customer.fullName)}</h3><div class="customer-meta">
+      <header><div><h3>${escapeHTML(customer.fullName)}${customer.isNew ? ' <span title="Új ügyfél" aria-label="Új ügyfél">!</span>' : ""}</h3><div class="customer-meta">
         ${customer.active ? "" : `<span class="customer-badge inactive">Inaktív</span>`}
       </div></div><button type="button" data-customer-edit="${escapeHTML(customer.id)}">Szerkesztés</button></header>
       ${(customer.locations || []).some(location => location.active !== false) ? `<p><b>Helyszínek:</b> ${(customer.locations || []).filter(location => location.active !== false).map(location => escapeHTML(location.address)).join(" · ")}</p>` : `<p><b>Helyszín:</b> még nincs megadva</p>`}

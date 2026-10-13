@@ -431,7 +431,7 @@
       }
       const { data: customerRows, error: customerError } = await client
         .from("customers")
-        .select("id,full_name,active,review_status,created_at,updated_at")
+        .select("id,full_name,active,review_status,source_app,created_at,updated_at")
         .is("archived_at", null)
         .order("full_name", { ascending: true });
       if (customerError) throw customerError;
@@ -487,6 +487,7 @@
           fullName: row.full_name,
           active: row.active,
           reviewStatus: row.review_status,
+          isNew: row.review_status === "pending" || (row.source_app === "kassza" && row.updated_at === row.created_at),
           createdAt: row.created_at,
           updatedAt: row.updated_at,
           customerType: detail.customer_type || "",
