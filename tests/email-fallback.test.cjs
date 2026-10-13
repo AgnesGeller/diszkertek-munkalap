@@ -27,4 +27,6 @@ assert.match(source, /formElement\.method = "POST"/);
 assert.match(source, /formElement\.target = frameName/);
 assert.match(source, /_next: new URL\(`email-sent\.html\?token=/);
 assert.match(source, /A FormSubmit nem igazolta vissza az e-mail elküldését/);
-console.log('PASS: e-mail-figyelmeztetés rendezése és visszaigazolt FormSubmit-űrlapküldés.');
+assert.match(source, /A kézi újraküldést rögzítettük\. A figyelmeztetés megmarad/);
+assert.match(source, /Az automatikus FormSubmit-küldés nem sikerült/);
+console.log('PASS: visszaigazolt FormSubmit-küldés és kézi küldésnél megmaradó figyelmeztetés.');

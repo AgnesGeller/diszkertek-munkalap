@@ -1,7 +1,7 @@
 const EMAIL_ENDPOINT = "https://formsubmit.co/info@diszkertek.hu";
 const EMAIL_RECIPIENT = "info@diszkertek.hu";
 const STABLE_APP_URL = "https://agnesgeller.github.io/diszkertek-munkalap/";
-const APP_VERSION = "66";
+const APP_VERSION = "67";
 const QUEUE_KEY = "diszkertek-munkalap-send-queue-v1";
 const MANAGER_VIEW_KEY = "diszkertek-munkalap-manager-view-v1";
 const DATABASE_FREE_LIMIT = 500 * 1024 * 1024;
@@ -177,8 +177,18 @@ function renderTeams() {
 
 function renderItems(targetId, prefix, list) {
   $(`#${targetId}`).innerHTML = list.map(([name, unit], index) => {
-    const inputMode = name.startsWith("Egyéb") || name === "Öntözőrendszer anyagok" ? "text" : "decimal";
-    return `<label class="material-row"><span>${index + 1}. ${escapeHTML(name)}${unit ? ` (${escapeHTML(unit)})` : ""}:</span><input name="${prefix}_${index}" inputmode="${inputMode}" aria-label="${escapeHTML(name)}"></label>`;
+    const fieldName = `${prefix}_${index}`;
+    if (name.startsWith("Egyéb")) {
+      const displayName = name.replace(/(\D)(\d+)$/, "$1 $2");
+      return `<fieldset class="material-other-row">
+        <legend>${index + 1}. ${escapeHTML(displayName)}</legend>
+        <label><span>Megnevezés</span><input name="${fieldName}" autocomplete="off" maxlength="160" aria-label="${escapeHTML(displayName)} megnevezése"></label>
+        <label><span>Mennyiség</span><input name="${fieldName}_quantity" inputmode="decimal" maxlength="20" aria-label="${escapeHTML(displayName)} mennyisége"></label>
+        <label><span>Ár (Ft)</span><input name="${fieldName}_price" inputmode="decimal" maxlength="20" aria-label="${escapeHTML(displayName)} ára forintban"></label>
+      </fieldset>`;
+    }
+    const inputMode = name === "Öntözőrendszer anyagok" ? "text" : "decimal";
+    return `<label class="material-row"><span>${index + 1}. ${escapeHTML(name)}${unit ? ` (${escapeHTML(unit)})` : ""}:</span><input name="${fieldName}" inputmode="${inputMode}" aria-label="${escapeHTML(name)}"></label>`;
   }).join("");
 }
 
@@ -189,6 +199,30 @@ function formDataObject() {
 function addIfFilled(payload, label, value) {
   const clean = String(value || "").trim();
   if (clean) payload[label] = clean;
+}
+
+function otherItemValues(data, prefix, index) {
+  const key = `${prefix}_${index}`;
+  return {
+    name: String(data[key] || "").trim(),
+    quantity: String(data[`${key}_quantity`] || "").trim(),
+    price: String(data[`${key}_price`] || "").trim()
+  };
+}
+
+function addMaterialToEmail(payload, section, prefix, name, unit, index, data) {
+  if (!name.startsWith("Egyéb")) {
+    addIfFilled(payload, `${section} – ${name}${unit ? ` (${unit})` : ""}`, data[`${prefix}_${index}`]);
+    return;
+  }
+  const item = otherItemValues(data, prefix, index);
+  if (!item.name && !item.quantity && !item.price) return;
+  const displayName = item.name || name.replace(/(\D)(\d+)$/, "$1 $2");
+  if (!item.quantity && !item.price) {
+    addIfFilled(payload, `${section} – ${name}`, item.name);
+    return;
+  }
+  payload[`${section} – ${displayName}`] = `Mennyiség: ${item.quantity || "—"} | Ár: ${item.price ? `${item.price} Ft` : "—"}`;
 }
 
 function buildEmailPayload(data, modified = false) {
@@ -219,8 +253,8 @@ function buildEmailPayload(data, modified = false) {
   addIfFilled(payload, "Gépbérlés 2", data.rental2);
   addIfFilled(payload, "Gépbérlés 3", data.rental3);
   addIfFilled(payload, "Feladat leírás / megjegyzés", data.description);
-  MAINTENANCE.forEach(([name, unit], index) => addIfFilled(payload, `Kertkarbantartás – ${name}${unit ? ` (${unit})` : ""}`, data[`maintenance_${index}`]));
-  CONSTRUCTION.forEach(([name, unit], index) => addIfFilled(payload, `Kertépítés / fuvarozás – ${name}${unit ? ` (${unit})` : ""}`, data[`construction_${index}`]));
+  MAINTENANCE.forEach(([name, unit], index) => addMaterialToEmail(payload, "Kertkarbantartás", "maintenance", name, unit, index, data));
+  CONSTRUCTION.forEach(([name, unit], index) => addMaterialToEmail(payload, "Kertépítés / fuvarozás", "construction", name, unit, index, data));
   return payload;
 }
 
@@ -428,7 +462,6 @@ function markQueueEmailHandledManually(queueId) {
   if (!item) return;
   item.emailHandledManually = true;
   delete item.emailError;
-  if (clearEmailFallbackStatus(item.record) && item.databaseSaved) item.statusUpdatePending = true;
   writeQueue(queue);
 }
 
@@ -555,6 +588,37 @@ function validateTeamRows() {
   return false;
 }
 
+function validateOtherItems() {
+  let firstInvalid = null;
+  for (const row of form.querySelectorAll(".material-other-row")) {
+    const name = row.querySelector('input[name]:not([name$="_quantity"]):not([name$="_price"])');
+    const quantity = row.querySelector('input[name$="_quantity"]');
+    const price = row.querySelector('input[name$="_price"]');
+    for (const field of [name, quantity, price]) field.setCustomValidity("");
+    const hasAnyValue = Boolean(name.value.trim() || quantity.value.trim() || price.value.trim());
+    if (!hasAnyValue) continue;
+    if (name.value.trim() && !quantity.value.trim() && !price.value.trim()) continue;
+    if (!name.value.trim()) {
+      name.setCustomValidity("Add meg az Egyéb tétel megnevezését.");
+      firstInvalid ||= name;
+    }
+    const quantityText = quantity.value.trim().replace(",", ".");
+    if (!/^\d+(?:\.\d{1,3})?$/.test(quantityText) || Number(quantityText) <= 0 || Number(quantityText) > 1000000) {
+      quantity.setCustomValidity("Adj meg 0-nál nagyobb, legfeljebb három tizedesjegyű mennyiséget.");
+      firstInvalid ||= quantity;
+    }
+    const priceText = price.value.trim().replace(",", ".");
+    if (!/^\d+(?:\.\d{1,2})?$/.test(priceText) || Number(priceText) < 0 || Number(priceText) > 100000000) {
+      price.setCustomValidity("Adj meg érvényes árat, legfeljebb két tizedesjeggyel.");
+      firstInvalid ||= price;
+    }
+  }
+  if (!firstInvalid) return true;
+  firstInvalid.reportValidity();
+  showStatus("Az Egyéb tételnél töltsd ki a megnevezést, a mennyiséget és az árat.");
+  return false;
+}
+
 function separateWorksheetIdentity() {
   if (!editingId || pendingCurrentQueueId) return false;
   const original = worksheets.find(item => item.id === editingId);
@@ -616,7 +680,7 @@ function updateWorksheetCache(saved) {
 form.addEventListener("submit", async event => {
   event.preventDefault();
   separateWorksheetIdentity();
-  if (!session || !form.reportValidity() || !validateTeamRows()) return;
+  if (!session || !validateOtherItems() || !validateTeamRows() || !form.reportValidity()) return;
   if (pendingCurrentQueueId) {
     showStatus("Ez a munkalap már küldésre vár. Nem mentettük el még egyszer.", "pending");
     return;
@@ -729,7 +793,7 @@ $("#fallbackSent").addEventListener("click", async () => {
   if (context?.worksheetId) {
     $("#fallbackConfirmDialog").close();
     fallbackEmailContext = null;
-    await clearWorksheetEmailWarning(context.worksheetId);
+    showOfficeStatus("A kézi újraküldést rögzítettük. A figyelmeztetés megmarad, mert az automatikus FormSubmit-küldés hibázott.", "success");
     return;
   }
   if (context?.queueId) markQueueEmailHandledManually(context.queueId);
@@ -800,11 +864,23 @@ function filledMaterialItems(data) {
   const result = [];
   MAINTENANCE.forEach(([name, unit], index) => {
     const value = String(data[`maintenance_${index}`] || "").trim();
-    if (value) result.push(`${name}: ${value}${unit ? ` ${unit}` : ""}`);
+    if (name.startsWith("Egyéb")) {
+      const item = otherItemValues(data, "maintenance", index);
+      if (item.name || item.quantity || item.price) {
+        if (!item.quantity && !item.price) result.push(`${name.replace(/(\D)(\d+)$/, "$1 $2")}: ${item.name}`);
+        else result.push(`${item.name || name.replace(/(\D)(\d+)$/, "$1 $2")} · Mennyiség: ${item.quantity || "—"} · Ár: ${item.price ? `${item.price} Ft` : "—"}`);
+      }
+    } else if (value) result.push(`${name}: ${value}${unit ? ` ${unit}` : ""}`);
   });
   CONSTRUCTION.forEach(([name, unit], index) => {
     const value = String(data[`construction_${index}`] || "").trim();
-    if (value) result.push(`${name}: ${value}${unit ? ` ${unit}` : ""}`);
+    if (name.startsWith("Egyéb")) {
+      const item = otherItemValues(data, "construction", index);
+      if (item.name || item.quantity || item.price) {
+        if (!item.quantity && !item.price) result.push(`${name.replace(/(\D)(\d+)$/, "$1 $2")}: ${item.name}`);
+        else result.push(`${item.name || name.replace(/(\D)(\d+)$/, "$1 $2")} · Mennyiség: ${item.quantity || "—"} · Ár: ${item.price ? `${item.price} Ft` : "—"}`);
+      }
+    } else if (value) result.push(`${name}: ${value}${unit ? ` ${unit}` : ""}`);
   });
   return result;
 }
@@ -826,8 +902,8 @@ function worksheetCardHTML(item, office = false) {
   const rentals = filledRentals(data);
   const officeStatus = {
     database_delayed: "Az adatbázis-mentés csak késleltetett újrapróbálással sikerült.",
-    email_fallback: "Az automatikus e-mail-küldés nem sikerült, és még nincs rögzítve sikeres újraküldés.",
-    database_delayed_email_fallback: "Az adatbázis-mentés késett, az e-mail-küldés pedig még nincs sikeresként rögzítve."
+    email_fallback: "Az automatikus FormSubmit-küldés nem sikerült; a munkalapot kézzel kell újraküldeni.",
+    database_delayed_email_fallback: "Az adatbázis-mentés késett, és az automatikus FormSubmit-küldés sem sikerült."
   }[data._officeStatus];
   const hasEmailWarning = ["email_fallback", "database_delayed_email_fallback"].includes(data._officeStatus);
   const canManagePending = session?.role === "manager" || Boolean(session?.delegatedBy);
@@ -1460,21 +1536,6 @@ function resendWorksheetEmail(id) {
   fallbackEmailContext = { payload: buildEmailPayload(item.data || {}, false), worksheetId: id, clearAfterReturn: false };
   externalEmailInProgress = true;
   window.location.href = fallbackEmailUrl(fallbackEmailContext.payload);
-}
-
-async function clearWorksheetEmailWarning(id) {
-  if (session?.role !== "manager") return;
-  const item = worksheets.find(worksheet => worksheet.id === id);
-  if (!item) return;
-  const updated = { ...item, data: { ...(item.data || {}) } };
-  if (!clearEmailFallbackStatus(updated)) return;
-  try {
-    const saved = await MunkalapDB.update(id, updated);
-    updateWorksheetCache(saved);
-    showOfficeStatus("Az e-mail újraküldését rögzítettük, a figyelmeztetést töröltük.", "success");
-  } catch (error) {
-    showOfficeStatus(`Az újraküldés megtörtént, de a figyelmeztetés nem törölhető: ${error?.message || "ismeretlen hiba"}.`, "error");
-  }
 }
 
 async function deleteWorksheet(id, button) {

@@ -1,5 +1,6 @@
 (function(root){
   'use strict';
+  const customItemCodes=['maintenance_21','maintenance_22','construction_19','construction_20','construction_21','construction_22'];
   function decimal(value,places,max) {
     const text=String(value??'').trim().replace(',','.');
     if(!new RegExp('^\\d+(?:\\.\\d{1,'+places+'})?$').test(text)||Number(text)>max) throw new Error('Érvénytelen mennyiség vagy egységár.');
@@ -32,8 +33,19 @@
       const valid=/^\d+$/.test(String(size))&&n>0&&n<=1000&&a!==null&&b!==null&&b>a;
       result.push({label:valid?`Csapat ${i}: ${size} fő, ${from}–${to} (${b-a} perc/fő)`:`Csapat ${i}: hiányos vagy hibás munkaidő, ellenőrizendő`,quantity:String(valid?n*(b-a):0),unit:'főperc',unitPrice:String(labor.active===false?0:labor.unit_price),divisor:60,reviewed:valid&&labor.confirmed&&labor.active!==false});
     }
+    const customCodesInUse=new Set();
+    for(const code of customItemCodes){
+      const label=String(data[code]||'').trim(),quantityText=String(data[code+'_quantity']||'').trim(),priceText=String(data[code+'_price']||'').trim();
+      if(!quantityText&&!priceText) continue;
+      customCodesInUse.add(code);
+      let quantity='0',unitPrice='0',valid=Boolean(label);
+      try{quantity=decimal(quantityText,3,1000000);valid=valid&&Number(quantity)>0;}catch(_){valid=false;}
+      try{unitPrice=decimal(priceText,2,100000000);}catch(_){valid=false;}
+      result.push({label:label||'Egyéb tétel – hiányzó megnevezés',quantity,unit:'tétel',unitPrice,divisor:1,reviewed:false,customItemValid:valid});
+    }
     for(const price of prices){
       if(price.code==='labor') continue;
+      if(customCodesInUse.has(price.code)) continue;
       const value=String(data[price.code]||'').trim();if(!value) continue;
       let quantity='1',numeric=true;try{quantity=decimal(value,3,1000000);}catch(_){numeric=false;}
       result.push({label:price.label+(numeric?'':': '+value)+(price.active===false?' – kézi árazás szükséges':''),quantity,unit:price.unit,unitPrice:String(price.active===false?0:price.unit_price),divisor:1,reviewed:numeric&&price.confirmed&&price.active!==false});

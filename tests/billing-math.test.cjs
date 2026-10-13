@@ -21,4 +21,8 @@ for(const value of ['', '0', '-1', 'hibás'])assert.equal(math.build({data:{cons
 assert.equal(math.build({data:{}},earthPrices).length,0,'Catalog extras are not automatically charged');
 items=math.build({data:{team_1_size:'1',team_1_arrival:'08:00',team_1_departure:'09:00',maintenance_0:'2'}},prices.map(p=>p.code==='maintenance_0'?{...p,active:false}:p));
 assert.equal(items[1].unitPrice,'0');assert.equal(items[1].reviewed,false);assert.ok(items[1].label.includes('kézi árazás'));
-console.log('PASS: person-minutes, multiple teams, decimal units, rounding, invalid inputs, provisional prices, and separate earth freight.');
+items=math.build({data:{maintenance_21:'Kézi szerszám',maintenance_21_quantity:'2,5',maintenance_21_price:'1200'}},prices);
+const custom=items.find(i=>i.label==='Kézi szerszám');
+assert.ok(custom,'Az Egyéb tételnek árlista-bejegyzés nélkül is meg kell jelennie az elszámolásban.');
+assert.equal(custom.quantity,'2.5');assert.equal(custom.unitPrice,'1200');assert.equal(math.total([custom]),3000);assert.equal(custom.reviewed,false);
+console.log('PASS: person-minutes, multiple teams, decimal units, rounding, invalid inputs, provisional prices, separate earth freight, and custom items.');
