@@ -1,7 +1,7 @@
 const EMAIL_ENDPOINT = "https://formsubmit.co/info@diszkertek.hu";
 const EMAIL_RECIPIENT = "info@diszkertek.hu";
 const STABLE_APP_URL = "https://agnesgeller.github.io/diszkertek-munkalap/";
-const APP_VERSION = "71";
+const APP_VERSION = "73";
 const QUEUE_KEY = "diszkertek-munkalap-send-queue-v1";
 const MANAGER_VIEW_KEY = "diszkertek-munkalap-manager-view-v1";
 const DATABASE_FREE_LIMIT = 500 * 1024 * 1024;
@@ -593,36 +593,24 @@ function validateTeamRows() {
 function validateOtherItems() {
   let firstInvalid = null;
   for (const row of form.querySelectorAll(".material-other-row")) {
-    const name = row.querySelector('input[name]:not([name$="_quantity"]):not([name$="_unit"]):not([name$="_price"])');
     const quantity = row.querySelector('input[name$="_quantity"]');
-    const unit = row.querySelector('input[name$="_unit"]');
     const price = row.querySelector('input[name$="_price"]');
-    for (const field of [name, quantity, unit, price]) field.setCustomValidity("");
-    const hasAnyValue = Boolean(name.value.trim() || quantity.value.trim() || unit.value.trim() || price.value.trim());
-    if (!hasAnyValue) continue;
-    if (name.value.trim() && !quantity.value.trim() && !unit.value.trim() && !price.value.trim()) continue;
-    if (!name.value.trim()) {
-      name.setCustomValidity("Add meg az Egyéb tétel megnevezését.");
-      firstInvalid ||= name;
-    }
+    quantity.setCustomValidity("");
+    price.setCustomValidity("");
     const quantityText = quantity.value.trim().replace(",", ".");
-    if (!/^\d+(?:\.\d{1,3})?$/.test(quantityText) || Number(quantityText) <= 0 || Number(quantityText) > 1000000) {
+    if (quantityText && (!/^\d+(?:\.\d{1,3})?$/.test(quantityText) || Number(quantityText) <= 0 || Number(quantityText) > 1000000)) {
       quantity.setCustomValidity("Adj meg 0-nál nagyobb, legfeljebb három tizedesjegyű mennyiséget.");
       firstInvalid ||= quantity;
     }
-    if (!unit.value.trim()) {
-      unit.setCustomValidity("Add meg az Egyéb tétel mértékegységét.");
-      firstInvalid ||= unit;
-    }
     const priceText = price.value.trim().replace(",", ".");
-    if (!/^\d+(?:\.\d{1,2})?$/.test(priceText) || Number(priceText) < 0 || Number(priceText) > 100000000) {
+    if (priceText && (!/^\d+(?:\.\d{1,2})?$/.test(priceText) || Number(priceText) < 0 || Number(priceText) > 100000000)) {
       price.setCustomValidity("Adj meg érvényes árat, legfeljebb két tizedesjeggyel.");
       firstInvalid ||= price;
     }
   }
   if (!firstInvalid) return true;
   firstInvalid.reportValidity();
-  showStatus("Az Egyéb tételnél töltsd ki a megnevezést, a mennyiséget, a mértékegységet és az árat.");
+  showStatus("Ellenőrizd az Egyéb tételnél megadott mennyiséget vagy árat.");
   return false;
 }
 

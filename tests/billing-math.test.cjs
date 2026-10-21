@@ -25,4 +25,11 @@ items=math.build({data:{maintenance_21:'Kézi szerszám',maintenance_21_quantity
 const custom=items.find(i=>i.label==='Kézi szerszám');
 assert.ok(custom,'Az Egyéb tételnek árlista-bejegyzés nélkül is meg kell jelennie az elszámolásban.');
 assert.equal(custom.quantity,'0.2');assert.equal(custom.unit,'óra');assert.equal(custom.unitPrice,'1200');assert.equal(math.total([custom]),240);assert.equal(custom.reviewed,false);
+items=math.build({data:{maintenance_21:'Szabad megnevezés'}},prices);
+assert.deepEqual(items[0],{label:'Szabad megnevezés',quantity:'1',unit:'tétel',unitPrice:'0',divisor:1,reviewed:false,sourceCode:'maintenance_21'});
+items=math.build({data:{maintenance_21_price:'500'}},prices);
+assert.deepEqual(items[0],{label:'Egyéb tétel',quantity:'1',unit:'tétel',unitPrice:'500',divisor:1,reviewed:false,sourceCode:'maintenance_21'});
+assert.equal(math.hasLowValueItem([{quantity:'1',unitPrice:'999.99',divisor:1}]),true);
+assert.equal(math.hasLowValueItem([{quantity:'1',unitPrice:'1000',divisor:1}]),false);
+assert.equal(math.hasLowValueItem([{quantity:'1',unitPrice:'0',divisor:1}]),false);
 console.log('PASS: person-minutes, multiple teams, decimal units, rounding, invalid inputs, provisional prices, separate earth freight, and custom items.');
