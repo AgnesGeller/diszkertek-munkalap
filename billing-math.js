@@ -61,6 +61,8 @@
     return result;
   }
   function hasLowValueItem(items){return (items||[]).some(item=>{try{const value=total([item]);return value>0&&value<1000;}catch(_){return false;}});}
-  const api={decimal,total,minutes,build,hasLowValueItem};
+  function hasUnpricedCustomItem(items){return (items||[]).some(item=>customItemCodes.includes(item.sourceCode)&&!(Number(item.unitPrice)>0));}
+  function needsItemReview(items){return hasLowValueItem(items)||hasUnpricedCustomItem(items);}
+  const api={decimal,total,minutes,build,hasLowValueItem,hasUnpricedCustomItem,needsItemReview};
   if(typeof module==='object'&&module.exports) module.exports=api;else root.BillingMath=api;
 })(typeof window==='undefined'?globalThis:window);

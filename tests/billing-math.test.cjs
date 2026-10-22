@@ -32,4 +32,8 @@ assert.deepEqual(items[0],{label:'Egyéb tétel',quantity:'1',unit:'tétel',unit
 assert.equal(math.hasLowValueItem([{quantity:'1',unitPrice:'999.99',divisor:1}]),true);
 assert.equal(math.hasLowValueItem([{quantity:'1',unitPrice:'1000',divisor:1}]),false);
 assert.equal(math.hasLowValueItem([{quantity:'1',unitPrice:'0',divisor:1}]),false);
+assert.equal(math.hasUnpricedCustomItem([{sourceCode:'maintenance_21',quantity:'1',unitPrice:'0',divisor:1}]),true);
+assert.equal(math.needsItemReview([{sourceCode:'maintenance_21',quantity:'1',unitPrice:'0',divisor:1}]),true);
+assert.equal(math.needsItemReview([{sourceCode:'maintenance_21',quantity:'1',unitPrice:'1500',divisor:1}]),false);
+assert.equal(math.needsItemReview([{sourceCode:'maintenance_0',quantity:'1',unitPrice:'0',divisor:1}]),false);
 console.log('PASS: person-minutes, multiple teams, decimal units, rounding, invalid inputs, provisional prices, separate earth freight, and custom items.');
