@@ -1,7 +1,7 @@
 const EMAIL_ENDPOINT = "https://formsubmit.co/info@diszkertek.hu";
 const EMAIL_RECIPIENT = "info@diszkertek.hu";
 const STABLE_APP_URL = "https://agnesgeller.github.io/diszkertek-munkalap/";
-const APP_VERSION = "87";
+const APP_VERSION = "88";
 const QUEUE_KEY = "diszkertek-munkalap-send-queue-v1";
 const MANAGER_VIEW_KEY = "diszkertek-munkalap-manager-view-v1";
 const DATABASE_FREE_LIMIT = 500 * 1024 * 1024;
@@ -575,6 +575,7 @@ async function syncQueue() {
 function resetForm(options = {}) {
   const preserveFallback = Boolean(options.preserveFallback);
   form.reset();
+  hideSpellingSuggestions();
   editingId = null;
   worksheetReturnView = "";
   pendingCurrentQueueId = null;
@@ -1276,6 +1277,30 @@ function renderDescriptionSuggestions(recent = ownRecentWorksheets()) {
   $("#descriptionSuggestionList").innerHTML = ranked.map(item => `<button type="button" data-description-suggestion>${escapeHTML(item.description)}</button>`).join("");
   panel.hidden = !ranked.length;
   if (!ranked.length) panel.open = false;
+}
+
+function spellingDictionaryWords() {
+  return [...MAINTENANCE, ...CONSTRUCTION, ...workerCatalogItems.map(item => [item.label])]
+    .flatMap(item => String(item[0] || "").match(/\p{L}{3,}/gu) || []);
+}
+
+function hideSpellingSuggestions() {
+  $("#spellingSuggestions").hidden = true;
+  $("#spellingSuggestionList").innerHTML = "";
+}
+
+function updateSpellingSuggestions() {
+  const input = form.elements.description;
+  const range = MunkalapSpellcheck.wordRange(input.value, input.selectionStart ?? input.value.length);
+  const suggestions = MunkalapSpellcheck.suggestions(range.word, spellingDictionaryWords());
+  if (!suggestions.length) {
+    hideSpellingSuggestions();
+    return;
+  }
+  $("#spellingSuggestionList").innerHTML = suggestions.map(suggestion =>
+    `<button type="button" data-spelling-suggestion="${escapeHTML(suggestion)}" data-word-start="${range.start}" data-word-end="${range.end}">${escapeHTML(suggestion)}</button>`
+  ).join("");
+  $("#spellingSuggestions").hidden = false;
 }
 
 function officeAddressKey(value) {
@@ -2342,6 +2367,24 @@ $("#descriptionSuggestions").addEventListener("click", event => {
   description.dispatchEvent(new Event("input", { bubbles: true }));
   description.focus();
   vibrateWorkerCatalog(25);
+});
+form.elements.description.addEventListener("input", updateSpellingSuggestions);
+form.elements.description.addEventListener("click", updateSpellingSuggestions);
+form.elements.description.addEventListener("keyup", event => {
+  if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) updateSpellingSuggestions();
+});
+$("#spellingSuggestionList").addEventListener("click", event => {
+  const button = event.target.closest("[data-spelling-suggestion]");
+  if (!button) return;
+  const input = form.elements.description;
+  const range = { start: Number(button.dataset.wordStart), end: Number(button.dataset.wordEnd) };
+  const replacement = button.dataset.spellingSuggestion;
+  input.value = MunkalapSpellcheck.replaceWord(input.value, range, replacement);
+  const cursor = range.start + replacement.length;
+  input.focus();
+  input.setSelectionRange(cursor, cursor);
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+  navigator.vibrate?.(20);
 });
 $("#workerSelectedItems").addEventListener("input", event => {
   const quantityInput = event.target.closest("[data-worker-catalog-quantity]");
