@@ -1,7 +1,7 @@
 const EMAIL_ENDPOINT = "https://formsubmit.co/info@diszkertek.hu";
 const EMAIL_RECIPIENT = "info@diszkertek.hu";
 const STABLE_APP_URL = "https://agnesgeller.github.io/diszkertek-munkalap/";
-const APP_VERSION = "96";
+const APP_VERSION = "97";
 const QUEUE_KEY = "diszkertek-munkalap-send-queue-v1";
 const MANAGER_VIEW_KEY = "diszkertek-munkalap-manager-view-v1";
 const DESCRIPTION_HISTORY_KEY = "diszkertek-munkalap-description-history-v1";
@@ -448,6 +448,14 @@ function readQueue() {
     );
     let queueChanged = validQueue.length !== queue.length;
     validQueue.forEach(item => {
+      const legacyEmailTimeout = item.databaseSaved && item.emailRetryStopped &&
+        /automatikus e-mail-küldés túl sokáig várakozott/i.test(String(item.emailError || ""));
+      if (legacyEmailTimeout) {
+        item.emailHandledManually = true;
+        delete item.emailError;
+        if (clearEmailFallbackStatus(item.record)) item.statusUpdatePending = true;
+        queueChanged = true;
+      }
       if (!item.emailSent && !item.emailHandledManually && item.emailError && !item.emailRetryStopped) {
         item.emailAttempted = true;
         item.emailRetryStopped = true;
@@ -516,10 +524,17 @@ function updateQueueNotice() {
     fallbackEmailButton.hidden = true;
     return;
   }
-  notice.hidden = false;
   const databaseWaiting = queue.filter(item => !item.databaseSaved).length;
   const emailWaitingCount = queue.filter(item => !item.emailSent && !item.emailHandledManually && !item.emailRetryStopped).length;
   const emailCheck = queue.find(item => !item.emailSent && !item.emailHandledManually && item.emailRetryStopped);
+  if (!databaseWaiting && !emailWaitingCount && !emailCheck) {
+    notice.hidden = true;
+    notice.textContent = "";
+    confirmEmailButton.hidden = true;
+    confirmEmailButton.dataset.queueId = "";
+    return;
+  }
+  notice.hidden = false;
   const stages = [];
   if (databaseWaiting) stages.push(`${databaseWaiting} adatbázis-mentése vár`);
   if (emailWaitingCount) stages.push(`${emailWaitingCount} e-mail-küldése vár`);

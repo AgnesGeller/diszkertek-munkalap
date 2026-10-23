@@ -45,4 +45,6 @@ assert.doesNotMatch(submitHandler, /Promise\.allSettled/);
 assert.doesNotMatch(submitHandler, /await withTimeout\([\s\S]*?MunkalapDB/);
 assert.match(submitHandler, /addQueueItem\(queued\);[\s\S]*?resetForm\(\);[\s\S]*?showSuccessDialog\(\);[\s\S]*?syncQueue\(\);/);
 assert.match(source, /if \(\(!item\.record\.customerId \|\| !item\.record\.locationId\)[\s\S]*?MunkalapDB\.registerCustomerSuggestion/);
+assert.match(source, /legacyEmailTimeout[\s\S]*?item\.emailHandledManually = true[\s\S]*?item\.statusUpdatePending = true/);
+assert.match(source, /if \(!databaseWaiting && !emailWaitingCount && !emailCheck\) \{[\s\S]*?notice\.hidden = true/);
 console.log('PASS: az azonnali FormSubmit-küldés, a háttérmentés és a kézi küldés figyelmeztetése rendben van.');
