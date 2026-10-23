@@ -12,7 +12,7 @@
   <link rel="apple-touch-icon" href="munkalap-m-icon-apple-180-v12.png">
   <link rel="stylesheet" href="styles.css?v=69">
   <link rel="stylesheet" href="logo-overrides.css?v=69">
-  <link rel="stylesheet" href="app-shell.css?v=82">
+  <link rel="stylesheet" href="app-shell.css?v=83">
   <title>Díszkertek – Napi munkalap</title>
   <meta name="description" content="Díszkertek napi munkalapok és ügyfélnyilvántartás.">
   <meta property="og:title" content="Díszkertek – Napi munkalap">
@@ -250,7 +250,7 @@
           <button id="budgetAdd" type="button">+ Saját tétel</button>
         </details>
         <label>Megjegyzés<textarea id="budgetNotes" maxlength="5000" rows="3"></textarea></label>
-        <section class="budget-discount"><label>Kedvezmény<select id="budgetDiscountType"><option value="none">Nincs kedvezmény</option><option value="amount">Konkrét összeg</option><option value="percent">Százalék</option></select></label><label>Érték<input id="budgetDiscountValue" type="number" min="0" step="0.01" value="0" disabled></label><p><span>Munkák összesen</span><b id="budgetSubtotal">0 Ft</b><span>Kedvezmény</span><b id="budgetDiscountTotal">0 Ft</b></p></section>
+        <section class="budget-discount"><label>Kedvezmény<select id="budgetDiscountType"><option value="none">Nincs kedvezmény</option><option value="amount">Konkrét összeg</option><option value="percent">Százalék</option></select></label><label>Érték<input id="budgetDiscountValue" type="text" inputmode="decimal" pattern="[0-9 ]+([,.][0-9]{1,2})?" maxlength="20" value="0" disabled></label><p><span>Munkák összesen</span><b id="budgetSubtotal">0 Ft</b><span>Kedvezmény</span><b id="budgetDiscountTotal">0 Ft</b></p></section>
         <label>Állapot<select id="budgetState"><option value="draft">Piszkozat</option><option value="ready">Ellenőrizve</option><option value="sent">Elküldve</option><option value="paid">Kifizetve</option></select></label>
         <p id="budgetStateHelp" class="budget-state-help">Piszkozat: elmenthető, de még szerkesztés alatt áll.</p>
         <p id="budgetSaveStatus" class="budget-save-status" role="status" aria-live="polite"></p>
@@ -353,9 +353,9 @@
   <script src="supabase.js?v=69"></script>
   <script src="supabase-config.js?v=69"></script>
   <script src="munkalap-data.js?v=76"></script>
-  <script src="app.js?v=82"></script>
-  <script src="billing-math.js?v=82"></script>
-  <script src="billing-settlements.js?v=82"></script>
+  <script src="app.js?v=83"></script>
+  <script src="billing-math.js?v=83"></script>
+  <script src="billing-settlements.js?v=83"></script>
   <script src="statistics-settlements.js?v=69"></script>
   <script src="munkalap-project-tracking.js?v=2"></script>
 </body>

@@ -1,7 +1,7 @@
 const EMAIL_ENDPOINT = "https://formsubmit.co/info@diszkertek.hu";
 const EMAIL_RECIPIENT = "info@diszkertek.hu";
 const STABLE_APP_URL = "https://agnesgeller.github.io/diszkertek-munkalap/";
-const APP_VERSION = "82";
+const APP_VERSION = "83";
 const QUEUE_KEY = "diszkertek-munkalap-send-queue-v1";
 const MANAGER_VIEW_KEY = "diszkertek-munkalap-manager-view-v1";
 const DATABASE_FREE_LIMIT = 500 * 1024 * 1024;
@@ -33,6 +33,41 @@ const CONSTRUCTION = [
 ];
 
 const $ = selector => document.querySelector(selector);
+
+function normalizePriceInputValue(value) {
+  return String(value ?? "").trim().replace(/[\s\u00a0]+/g, "").replace(",", ".");
+}
+
+function formatPriceInputValue(value) {
+  const compact = String(value ?? "").replace(/[\s\u00a0]+/g, "").replace(".", ",").replace(/[^\d,]/g, "");
+  if (!compact) return "";
+  const separator = compact.indexOf(",");
+  const integer = (separator < 0 ? compact : compact.slice(0, separator)) || "0";
+  const fraction = separator < 0 ? "" : compact.slice(separator + 1).replace(/,/g, "").slice(0, 2);
+  const grouped = integer.replace(/^0+(?=\d)/, "").replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+  return separator < 0 ? grouped : `${grouped},${fraction}`;
+}
+
+function formatPriceInputElement(input) {
+  const original = input.value;
+  const cursor = input.selectionStart ?? original.length;
+  const meaningfulBeforeCursor = original.slice(0, cursor).replace(/[\s\u00a0]/g, "").length;
+  const formatted = formatPriceInputValue(original);
+  input.value = formatted;
+  let nextCursor = 0;
+  let meaningful = 0;
+  while (nextCursor < formatted.length && meaningful < meaningfulBeforeCursor) {
+    if (!/[\s\u00a0]/.test(formatted[nextCursor])) meaningful += 1;
+    nextCursor += 1;
+  }
+  input.setSelectionRange?.(nextCursor, nextCursor);
+  return normalizePriceInputValue(formatted);
+}
+
+window.normalizePriceInputValue = normalizePriceInputValue;
+window.formatPriceInputValue = formatPriceInputValue;
+window.formatPriceInputElement = formatPriceInputElement;
+
 const form = $("#worksheetForm");
 const statusBox = $("#status");
 const fallbackEmailButton = $("#fallbackEmailButton");
@@ -187,7 +222,7 @@ function renderItems(targetId, prefix, list) {
         <label><span>Megnevezés</span><input name="${fieldName}" autocomplete="off" maxlength="160" aria-label="${escapeHTML(displayName)} megnevezése"></label>
         <label><span>Mennyiség</span><input name="${fieldName}_quantity" type="text" inputmode="decimal" pattern="[0-9]+([,.][0-9]{1,3})?" maxlength="20" placeholder="pl. 1,5" title="Egész vagy legfeljebb három tizedesjegyű szám" aria-label="${escapeHTML(displayName)} mennyisége"></label>
         <label><span>Mértékegység</span><input name="${fieldName}_unit" autocomplete="off" maxlength="40" placeholder="pl. db, m², óra" aria-label="${escapeHTML(displayName)} mértékegysége"></label>
-        <label><span>Ár (Ft)</span><input name="${fieldName}_price" inputmode="decimal" maxlength="20" aria-label="${escapeHTML(displayName)} ára forintban"></label>
+        <label><span>Ár (Ft)</span><input name="${fieldName}_price" inputmode="decimal" pattern="[0-9 ]+([,.][0-9]{1,2})?" maxlength="20" aria-label="${escapeHTML(displayName)} ára forintban"></label>
       </fieldset>`;
     }
     const inputMode = name === "Öntözőrendszer anyagok" ? "text" : "decimal";
@@ -210,7 +245,7 @@ function otherItemValues(data, prefix, index) {
     name: String(data[key] || "").trim(),
     quantity: String(data[`${key}_quantity`] || "").trim(),
     unit: String(data[`${key}_unit`] || "").trim(),
-    price: String(data[`${key}_price`] || "").trim()
+    price: normalizePriceInputValue(data[`${key}_price`])
   };
 }
 
@@ -226,7 +261,7 @@ function addMaterialToEmail(payload, section, prefix, name, unit, index, data) {
     addIfFilled(payload, `${section} – ${name}`, item.name);
     return;
   }
-  payload[`${section} – ${displayName}`] = `Mennyiség: ${item.quantity || "—"}${item.unit ? ` ${item.unit}` : ""} | Ár: ${item.price ? `${item.price} Ft` : "—"}`;
+  payload[`${section} – ${displayName}`] = `Mennyiség: ${item.quantity || "—"}${item.unit ? ` ${item.unit}` : ""} | Ár: ${item.price ? `${formatPriceInputValue(item.price)} Ft` : "—"}`;
 }
 
 function buildEmailPayload(data, modified = false) {
@@ -602,7 +637,7 @@ function workerCatalogQuantityIsValid(value) {
 }
 
 function workerCatalogCustomPriceIsValid(value) {
-  const normalized = String(value || "").trim().replace(",", ".");
+  const normalized = normalizePriceInputValue(value);
   if (!normalized) return true;
   return /^\d+(?:\.\d{1,2})?$/.test(normalized)
     && Number(normalized) >= 0
@@ -625,6 +660,7 @@ function updateWorkerCatalogQuantityState(row, item) {
   const status = row.querySelector("[data-worker-quantity-status]");
   if (status) status.textContent = valid ? "✓ Beírva a munkalapra" : "Mennyiség hiányzik";
   $("#workerSelectedCount").textContent = workerCatalogProgressText();
+  updateWorkerCatalogCompletionState(row, item);
   return valid;
 }
 
@@ -641,16 +677,35 @@ function updateWorkerCatalogPriceState(row, item) {
         ? "Egyedi ár – az Iroda ellenőrzi"
         : "Nem kötelező – üresen az árlistás ár számít";
   }
+  updateWorkerCatalogCompletionState(row, item);
   return valid;
+}
+
+function updateWorkerCatalogCompletionState(row, item) {
+  const quantityValid = workerCatalogQuantityIsValid(item?.quantity);
+  const price = normalizePriceInputValue(item?.customUnitPrice);
+  const priceValid = workerCatalogCustomPriceIsValid(price);
+  const complete = quantityValid && priceValid;
+  row.classList.toggle("entry-complete", complete);
+  const status = row.querySelector("[data-worker-entry-status]");
+  if (!status) return;
+  status.textContent = !quantityValid
+    ? "A mennyiséget még meg kell adni"
+    : !priceValid
+      ? "Az egyedi ár hibás"
+      : price
+        ? "✓ A tétel és az egyedi ár bekerült a listába"
+        : "✓ A tétel bekerült a listába";
 }
 
 function renderWorkerSelectedItems() {
   const target = $("#workerSelectedItems");
   target.innerHTML = [...selectedWorkerCatalogItems.values()].map(item => {
     const valid = workerCatalogQuantityIsValid(item.quantity);
-    const customPrice = String(item.customUnitPrice || "").trim();
+    const customPrice = normalizePriceInputValue(item.customUnitPrice);
     const priceValid = workerCatalogCustomPriceIsValid(customPrice);
-    return `<div class="worker-selected-item ${valid ? "quantity-ready" : "quantity-missing"}${customPrice && priceValid ? " custom-price" : ""}${priceValid ? "" : " custom-price-invalid"}" data-worker-selected="${escapeHTML(item.code)}"><span>${escapeHTML(workerCatalogLabel(item.label))}</span><label>Mennyiség (${escapeHTML(item.unit)})<input data-worker-catalog-quantity type="text" inputmode="decimal" pattern="[0-9]+([,.][0-9]{1,3})?" maxlength="20" value="${escapeHTML(item.quantity)}" aria-label="${escapeHTML(workerCatalogLabel(item.label))} mennyisége"><small data-worker-quantity-status>${valid ? "✓ Beírva a munkalapra" : "Mennyiség hiányzik"}</small></label><label>Egyedi egységár (Ft)<input data-worker-catalog-price type="text" inputmode="decimal" pattern="[0-9]+([,.][0-9]{1,2})?" maxlength="20" value="${escapeHTML(customPrice)}" placeholder="Nem kötelező" aria-label="${escapeHTML(workerCatalogLabel(item.label))} egyedi egységára"><small data-worker-price-status>${!priceValid ? "Hibás ár" : customPrice ? "Egyedi ár – az Iroda ellenőrzi" : "Nem kötelező – üresen az árlistás ár számít"}</small></label><button type="button" data-worker-catalog-remove="${escapeHTML(item.code)}">Törlés</button></div>`;
+    const completeText = !valid ? "A mennyiséget még meg kell adni" : !priceValid ? "Az egyedi ár hibás" : customPrice ? "✓ A tétel és az egyedi ár bekerült a listába" : "✓ A tétel bekerült a listába";
+    return `<div class="worker-selected-item ${valid ? "quantity-ready" : "quantity-missing"}${customPrice && priceValid ? " custom-price" : ""}${priceValid ? "" : " custom-price-invalid"}${valid && priceValid ? " entry-complete" : ""}" data-worker-selected="${escapeHTML(item.code)}"><span>${escapeHTML(workerCatalogLabel(item.label))}</span><label>Mennyiség (${escapeHTML(item.unit)})<input data-worker-catalog-quantity type="text" inputmode="decimal" pattern="[0-9]+([,.][0-9]{1,3})?" maxlength="20" value="${escapeHTML(item.quantity)}" aria-label="${escapeHTML(workerCatalogLabel(item.label))} mennyisége"><small data-worker-quantity-status>${valid ? "✓ Beírva a munkalapra" : "Mennyiség hiányzik"}</small></label><label>Egyedi egységár (Ft)<input data-worker-catalog-price type="text" inputmode="decimal" pattern="[0-9 ]+([,.][0-9]{1,2})?" maxlength="20" value="${escapeHTML(formatPriceInputValue(customPrice))}" placeholder="Nem kötelező" aria-label="${escapeHTML(workerCatalogLabel(item.label))} egyedi egységára"><small data-worker-price-status>${!priceValid ? "Hibás ár" : customPrice ? "Egyedi ár – az Iroda ellenőrzi" : "Nem kötelező – üresen az árlistás ár számít"}</small></label><strong class="worker-entry-status" data-worker-entry-status>${completeText}</strong><button type="button" data-worker-catalog-remove="${escapeHTML(item.code)}">Törlés</button></div>`;
   }).join("");
   const selectedCount = selectedWorkerCatalogItems.size;
   $("#workerSelectedCount").textContent = workerCatalogProgressText();
@@ -813,7 +868,7 @@ function validateOtherItems() {
       quantity.setCustomValidity("Adj meg 0-nál nagyobb, legfeljebb három tizedesjegyű mennyiséget.");
       firstInvalid ||= quantity;
     }
-    const priceText = price.value.trim().replace(",", ".");
+    const priceText = normalizePriceInputValue(price.value);
     if (priceText && (!/^\d+(?:\.\d{1,2})?$/.test(priceText) || Number(priceText) < 0 || Number(priceText) > 100000000)) {
       price.setCustomValidity("Adj meg érvényes árat, legfeljebb két tizedesjeggyel.");
       firstInvalid ||= price;
@@ -877,6 +932,9 @@ function separateWorksheetIdentity() {
 
 function worksheetFromForm(existing) {
   const data = formDataObject();
+  for (const name of Object.keys(data)) {
+    if (name.endsWith("_price")) data[name] = normalizePriceInputValue(data[name]);
+  }
   data.catalogItems = extraWorkerCatalogItems();
   const customer = customerDirectory.find(item => customerNameKey(item.fullName) === customerNameKey(data.customerName));
   data.customerName = customer?.fullName || String(data.customerName || "").trim().replace(/\s+/g, " ").replace(/ zoli$/i, " Zoltán");
@@ -1097,7 +1155,7 @@ function filledMaterialItems(data) {
       const item = otherItemValues(data, "maintenance", index);
       if (item.name || item.quantity || item.unit || item.price) {
         if (!item.quantity && !item.unit && !item.price) result.push(`${name.replace(/(\D)(\d+)$/, "$1 $2")}: ${item.name}`);
-        else result.push(`${item.name || name.replace(/(\D)(\d+)$/, "$1 $2")} · Mennyiség: ${item.quantity || "—"}${item.unit ? ` ${item.unit}` : ""} · Ár: ${item.price ? `${item.price} Ft` : "—"}`);
+        else result.push(`${item.name || name.replace(/(\D)(\d+)$/, "$1 $2")} · Mennyiség: ${item.quantity || "—"}${item.unit ? ` ${item.unit}` : ""} · Ár: ${item.price ? `${formatPriceInputValue(item.price)} Ft` : "—"}`);
       }
     } else if (value) result.push(`${name}: ${value}${unit ? ` ${unit}` : ""}`);
   });
@@ -1107,7 +1165,7 @@ function filledMaterialItems(data) {
       const item = otherItemValues(data, "construction", index);
       if (item.name || item.quantity || item.unit || item.price) {
         if (!item.quantity && !item.unit && !item.price) result.push(`${name.replace(/(\D)(\d+)$/, "$1 $2")}: ${item.name}`);
-        else result.push(`${item.name || name.replace(/(\D)(\d+)$/, "$1 $2")} · Mennyiség: ${item.quantity || "—"}${item.unit ? ` ${item.unit}` : ""} · Ár: ${item.price ? `${item.price} Ft` : "—"}`);
+        else result.push(`${item.name || name.replace(/(\D)(\d+)$/, "$1 $2")} · Mennyiség: ${item.quantity || "—"}${item.unit ? ` ${item.unit}` : ""} · Ár: ${item.price ? `${formatPriceInputValue(item.price)} Ft` : "—"}`);
       }
     } else if (value) result.push(`${name}: ${value}${unit ? ` ${unit}` : ""}`);
   });
@@ -1730,6 +1788,7 @@ function fillFormFromWorksheet(item, returnView = "") {
   for (const [name, value] of Object.entries(item.data || {})) {
     if (form.elements[name]) form.elements[name].value = value ?? "";
   }
+  for (const input of form.querySelectorAll('input[name$="_price"]')) input.value = formatPriceInputValue(input.value);
   form.elements.teamLeader.value = item.leader;
   form.elements.date.value = formatHungarianDate(item.date);
   form.elements.customerName.value = item.customer;
@@ -2275,7 +2334,7 @@ $("#workerSelectedItems").addEventListener("input", event => {
     if (field) field.value = quantityInput.value;
     updateWorkerCatalogQuantityState(row, item);
   } else {
-    item.customUnitPrice = priceInput.value;
+    item.customUnitPrice = formatPriceInputElement(priceInput);
     updateWorkerCatalogPriceState(row, item);
   }
 });
@@ -2306,7 +2365,10 @@ $(".materials-section").addEventListener("change", event => {
   else selectedWorkerCatalogItems.delete(item.code);
   renderWorkerSelectedItems();
 });
-form.addEventListener("input", () => { formDirty = true; });
+form.addEventListener("input", event => {
+  if (event.target.matches('input[name$="_price"]')) formatPriceInputElement(event.target);
+  formDirty = true;
+});
 $("#teams").addEventListener("input", event => event.target.setCustomValidity?.(""));
 
 const dateField = form.elements.date;

@@ -2,7 +2,7 @@
   'use strict';
   const customItemCodes=['maintenance_21','maintenance_22','construction_19','construction_20','construction_21','construction_22'];
   function decimal(value,places,max) {
-    const text=String(value??'').trim().replace(',','.');
+    const text=String(value??'').trim().replace(/[\s\u00a0]+/g,'').replace(',','.');
     if(!new RegExp('^\\d+(?:\\.\\d{1,'+places+'})?$').test(text)||Number(text)>max) throw new Error('Érvénytelen mennyiség vagy egységár.');
     return text;
   }

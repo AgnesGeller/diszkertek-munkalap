@@ -1,5 +1,7 @@
 const assert=require('node:assert/strict');
 const math=require('../billing-math.js');
+assert.equal(math.decimal('200 000',2,100000000),'200000','Az ezres tagolású ár maradjon számolható.');
+assert.equal(math.decimal('20 000,50',2,100000000),'20000.50','A tagolt, tizedes árat is fogadja el.');
 const prices=[{code:'labor',label:'Munkadíj',unit_price:12000,confirmed:true},{code:'maintenance_0',label:'Szállítás',unit:'m³',unit_price:1,confirmed:false}];
 let items=math.build({data:{team_1_size:'4',team_1_arrival:'08:00',team_1_departure:'16:00'}},prices);
 assert.equal(items[0].quantity,'1920');assert.equal(math.total(items),384000);
