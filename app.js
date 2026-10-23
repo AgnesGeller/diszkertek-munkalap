@@ -1,7 +1,7 @@
 const EMAIL_ENDPOINT = "https://formsubmit.co/ajax/info@diszkertek.hu";
 const EMAIL_RECIPIENT = "info@diszkertek.hu";
 const STABLE_APP_URL = "https://agnesgeller.github.io/diszkertek-munkalap/";
-const APP_VERSION = "92";
+const APP_VERSION = "93";
 const QUEUE_KEY = "diszkertek-munkalap-send-queue-v1";
 const MANAGER_VIEW_KEY = "diszkertek-munkalap-manager-view-v1";
 const DESCRIPTION_HISTORY_KEY = "diszkertek-munkalap-description-history-v1";
@@ -494,29 +494,23 @@ function updateQueueNotice() {
     confirmEmailButton.dataset.queueId = "";
     return;
   }
+  const officeDevice = session.role === "manager" || Boolean(session.delegatedBy);
   const emailWaiting = queue.find(item => !item.emailSent && !item.emailHandledManually && !item.emailRetryStopped);
-  if (emailWaiting && !fallbackEmailContext) {
+  if (officeDevice && emailWaiting && !fallbackEmailContext) {
     fallbackEmailContext = { payload: emailWaiting.emailPayload, queueId: emailWaiting.queueId, clearAfterReturn: false };
     fallbackEmailButton.hidden = false;
-  }
-  const officeDevice = session.role === "manager" || Boolean(session.delegatedBy);
-  notice.hidden = false;
-  const databaseWaiting = queue.filter(item => !item.databaseSaved).length;
-  const emailWaitingCount = queue.filter(item => !item.emailSent && !item.emailHandledManually && !item.emailRetryStopped).length;
-  const emailCheck = queue.find(item => !item.emailSent && !item.emailHandledManually && item.emailRetryStopped);
-  if (!officeDevice && emailCheck) {
-    notice.textContent = "A munkalap elmentve. Az e-mail beérkezését az iroda ellenőrzi. Ne küldd el újra a munkalapot.";
-    confirmEmailButton.hidden = true;
-    fallbackEmailButton.hidden = true;
-    if (fallbackEmailContext?.queueId === emailCheck.queueId) fallbackEmailContext = null;
-    return;
   }
   if (!officeDevice) {
     notice.hidden = true;
     notice.textContent = "";
     confirmEmailButton.hidden = true;
+    fallbackEmailButton.hidden = true;
     return;
   }
+  notice.hidden = false;
+  const databaseWaiting = queue.filter(item => !item.databaseSaved).length;
+  const emailWaitingCount = queue.filter(item => !item.emailSent && !item.emailHandledManually && !item.emailRetryStopped).length;
+  const emailCheck = queue.find(item => !item.emailSent && !item.emailHandledManually && item.emailRetryStopped);
   const stages = [];
   if (databaseWaiting) stages.push(`${databaseWaiting} adatbázis-mentése vár`);
   if (emailWaitingCount) stages.push(`${emailWaitingCount} e-mail-küldése vár`);
@@ -582,6 +576,7 @@ async function syncQueue() {
     let queue = readQueue();
     let changed = false;
     const canSyncAll = session.role === "manager" || Boolean(session.delegatedBy);
+    const officeDevice = canSyncAll;
     for (const item of queue.filter(entry => canSyncAll || (entry.queuedBy || entry.userId) === session.userId)) {
       if (!item.databaseSaved) {
         try {
@@ -609,6 +604,10 @@ async function syncQueue() {
       const fallbackDecisionPending =
         fallbackEmailContext?.queueId === item.queueId &&
         (externalEmailInProgress || $("#fallbackConfirmDialog").open);
+      if (!officeDevice && item.emailRetryStopped && !item.emailSent && !item.emailHandledManually) {
+        item.emailHandledManually = true;
+        changed = true;
+      }
       if (!item.emailSent && !item.emailHandledManually && !item.emailRetryStopped && !fallbackDecisionPending) {
         item.emailAttempted = true;
         changed = true;
@@ -1158,7 +1157,15 @@ form.addEventListener("submit", async event => {
     if (emailAttempted) {
       fallbackEmailContext = null;
       fallbackEmailButton.hidden = true;
-      showStatus("A munkalap elmentve. Az e-mail beérkezését az iroda ellenőrzi. Ne küldd el újra a munkalapot.", "pending");
+      const officeDevice = session.role === "manager" || Boolean(session.delegatedBy);
+      if (!officeDevice) {
+        pendingCurrentQueueId = null;
+        resetForm();
+        showSuccessDialog();
+        syncQueue();
+        return;
+      }
+      showStatus("Az e-mail beérkezése ellenőrizendő. Az alkalmazás nem küldi el újra automatikusan.", "pending");
     } else {
       fallbackEmailContext = { payload: emailPayload, queueId: queued.queueId, clearAfterReturn: true };
       fallbackEmailButton.hidden = false;
