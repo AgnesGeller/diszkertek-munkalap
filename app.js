@@ -503,7 +503,7 @@ function updateQueueNotice() {
     confirmEmailButton.dataset.queueId = "";
     return;
   }
-  const officeDevice = session.role === "manager" || Boolean(session.delegatedBy);
+  const officeDevice = session.role === "manager";
   const emailWaiting = queue.find(item => !item.emailSent && !item.emailHandledManually && !item.emailRetryStopped);
   if (officeDevice && emailWaiting && !fallbackEmailContext) {
     fallbackEmailContext = { payload: emailWaiting.emailPayload, queueId: emailWaiting.queueId, clearAfterReturn: false };
@@ -585,7 +585,7 @@ async function syncQueue() {
     let queue = readQueue();
     let changed = false;
     const canSyncAll = session.role === "manager" || Boolean(session.delegatedBy);
-    const officeDevice = canSyncAll;
+    const officeDevice = session.role === "manager";
     for (const item of queue.filter(entry => canSyncAll || (entry.queuedBy || entry.userId) === session.userId)) {
       if (!item.databaseSaved) {
         try {
@@ -1166,7 +1166,7 @@ form.addEventListener("submit", async event => {
     if (emailAttempted) {
       fallbackEmailContext = null;
       fallbackEmailButton.hidden = true;
-      const officeDevice = session.role === "manager" || Boolean(session.delegatedBy);
+      const officeDevice = session.role === "manager";
       if (!officeDevice) {
         pendingCurrentQueueId = null;
         resetForm();
@@ -2458,14 +2458,12 @@ $("#reloadHistory").addEventListener("click", async () => {
     await Promise.all([loadWorksheets(), loadDescriptionHistory()]);
     updateQueueNotice();
     const waiting = ownQueue().length;
-    if (waiting && (session.role === "manager" || session.delegatedBy)) {
+    if (waiting && session.role === "manager") {
       const pending = ownQueue();
       const databaseWaiting = pending.filter(item => !item.databaseSaved).length;
       const emailWaiting = pending.filter(item => !item.emailSent && !item.emailHandledManually && !item.emailRetryStopped).length;
       const emailCheck = pending.filter(item => !item.emailSent && !item.emailHandledManually && item.emailRetryStopped).length;
       showStatus(`${waiting} munkalap feldolgozása még nem teljes: ${databaseWaiting} adatbázis-mentés, ${emailWaiting} e-mail-küldés vár${emailCheck ? `, ${emailCheck} e-mail beérkezése ellenőrizendő` : ""}. A részletes jelzés a Munkalapjaim felett látható.`, "pending");
-    } else if (waiting) {
-      showStatus("A munkalapok frissítése folyamatban van. Az alkalmazás automatikusan folytatja.", "pending");
     } else {
       showStatus("A munkalapok frissítve.", "success");
     }
