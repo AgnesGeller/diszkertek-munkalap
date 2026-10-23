@@ -47,6 +47,13 @@ assert.deepEqual(math.catalogMatches(catalog,'szegély').map(item=>item.code),['
 const workerCatalogPrices=[...prices,{code:'extra_mulch',label:'Mulcs / fenyőkéreg',unit:'m³',unit_price:45000,confirmed:true,active:true}];
 items=math.build({data:{catalogItems:[{code:'extra_mulch',label:'A dolgozó által mentett név',unit:'rossz egység',quantity:'1,5'}]}},workerCatalogPrices);
 assert.deepEqual(items[0],{label:'Mulcs / fenyőkéreg',quantity:'1.5',unit:'m³',unitPrice:'45000',divisor:1,reviewed:true,sourceCode:'extra_mulch'},'A dolgozói tétel az irodai árlistából kapjon nevet, egységet és árat.');
+items=math.build({data:{catalogItems:[{code:'extra_mulch',label:'Mulcs',unit:'m³',quantity:'1,5',customUnitPrice:'52000'}]}},workerCatalogPrices);
+assert.equal(items[0].unitPrice,'52000','A dolgozó által megadott egyedi egységár írja felül az árlistás árat.');
+assert.equal(items[0].reviewed,false,'Az egyedi ár mindig kérjen irodai ellenőrzést.');
+assert.equal(items[0].customPrice,true);assert.equal(items[0].label,'Mulcs / fenyőkéreg','A belső figyelmeztetés ne kerüljön az ügyfélnek készülő tételnévbe.');
+items=math.build({data:{maintenance_0:'2',catalogItems:[{code:'maintenance_0',label:'Szállítás',unit:'m³',quantity:'2',customUnitPrice:'2500'}]}},prices);
+assert.equal(items.length,1,'Az árlistás alapmező és az egyedi ár ne készítsen két elszámolási tételt.');
+assert.equal(items[0].unitPrice,'2500');assert.equal(items[0].reviewed,false);
 items=math.build({data:{catalogItems:[{code:'mar_nem_aktiv',label:'Régi tétel',unit:'db',quantity:'2'}]}},prices);
 assert.deepEqual(items[0],{label:'Régi tétel',quantity:'2',unit:'db',unitPrice:'0',divisor:1,reviewed:false,sourceCode:'mar_nem_aktiv'},'A már nem elérhető katalógustétel maradjon meg, de kérjen irodai árazást.');
 console.log('PASS: person-minutes, multiple teams, decimal units, rounding, invalid inputs, provisional prices, separate earth freight, custom items, and catalog search.');

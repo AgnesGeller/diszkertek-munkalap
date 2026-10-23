@@ -1,7 +1,7 @@
 const EMAIL_ENDPOINT = "https://formsubmit.co/info@diszkertek.hu";
 const EMAIL_RECIPIENT = "info@diszkertek.hu";
 const STABLE_APP_URL = "https://agnesgeller.github.io/diszkertek-munkalap/";
-const APP_VERSION = "79";
+const APP_VERSION = "81";
 const QUEUE_KEY = "diszkertek-munkalap-send-queue-v1";
 const MANAGER_VIEW_KEY = "diszkertek-munkalap-manager-view-v1";
 const DATABASE_FREE_LIMIT = 500 * 1024 * 1024;
@@ -600,6 +600,14 @@ function workerCatalogQuantityIsValid(value) {
     && Number(normalized) <= 1000000;
 }
 
+function workerCatalogCustomPriceIsValid(value) {
+  const normalized = String(value || "").trim().replace(",", ".");
+  if (!normalized) return true;
+  return /^\d+(?:\.\d{1,2})?$/.test(normalized)
+    && Number(normalized) >= 0
+    && Number(normalized) <= 100000000;
+}
+
 function workerCatalogProgressText() {
   const items = [...selectedWorkerCatalogItems.values()];
   if (!items.length) return "(még nincs)";
@@ -619,11 +627,29 @@ function updateWorkerCatalogQuantityState(row, item) {
   return valid;
 }
 
+function updateWorkerCatalogPriceState(row, item) {
+  const value = String(item?.customUnitPrice || "").trim();
+  const valid = workerCatalogCustomPriceIsValid(value);
+  row.classList.toggle("custom-price", Boolean(value && valid));
+  row.classList.toggle("custom-price-invalid", !valid);
+  const status = row.querySelector("[data-worker-price-status]");
+  if (status) {
+    status.textContent = !valid
+      ? "Hibás ár"
+      : value
+        ? "Egyedi ár – az Iroda ellenőrzi"
+        : "Nem kötelező – üresen az árlistás ár számít";
+  }
+  return valid;
+}
+
 function renderWorkerSelectedItems() {
   const target = $("#workerSelectedItems");
   target.innerHTML = [...selectedWorkerCatalogItems.values()].map(item => {
     const valid = workerCatalogQuantityIsValid(item.quantity);
-    return `<div class="worker-selected-item ${valid ? "quantity-ready" : "quantity-missing"}" data-worker-selected="${escapeHTML(item.code)}"><span>${escapeHTML(workerCatalogLabel(item.label))}</span><label>Mennyiség (${escapeHTML(item.unit)})<input data-worker-catalog-quantity type="text" inputmode="decimal" pattern="[0-9]+([,.][0-9]{1,3})?" maxlength="20" value="${escapeHTML(item.quantity)}" aria-label="${escapeHTML(workerCatalogLabel(item.label))} mennyisége"><small data-worker-quantity-status>${valid ? "✓ Beírva a munkalapra" : "Mennyiség hiányzik"}</small></label><button type="button" data-worker-catalog-remove="${escapeHTML(item.code)}">Törlés</button></div>`;
+    const customPrice = String(item.customUnitPrice || "").trim();
+    const priceValid = workerCatalogCustomPriceIsValid(customPrice);
+    return `<div class="worker-selected-item ${valid ? "quantity-ready" : "quantity-missing"}${customPrice && priceValid ? " custom-price" : ""}${priceValid ? "" : " custom-price-invalid"}" data-worker-selected="${escapeHTML(item.code)}"><span>${escapeHTML(workerCatalogLabel(item.label))}</span><label>Mennyiség (${escapeHTML(item.unit)})<input data-worker-catalog-quantity type="text" inputmode="decimal" pattern="[0-9]+([,.][0-9]{1,3})?" maxlength="20" value="${escapeHTML(item.quantity)}" aria-label="${escapeHTML(workerCatalogLabel(item.label))} mennyisége"><small data-worker-quantity-status>${valid ? "✓ Beírva a munkalapra" : "Mennyiség hiányzik"}</small></label><label>Egyedi egységár (Ft)<input data-worker-catalog-price type="text" inputmode="decimal" pattern="[0-9]+([,.][0-9]{1,2})?" maxlength="20" value="${escapeHTML(customPrice)}" placeholder="Nem kötelező" aria-label="${escapeHTML(workerCatalogLabel(item.label))} egyedi egységára"><small data-worker-price-status>${!priceValid ? "Hibás ár" : customPrice ? "Egyedi ár – az Iroda ellenőrzi" : "Nem kötelező – üresen az árlistás ár számít"}</small></label><button type="button" data-worker-catalog-remove="${escapeHTML(item.code)}">Törlés</button></div>`;
   }).join("");
   const selectedCount = selectedWorkerCatalogItems.size;
   $("#workerSelectedCount").textContent = workerCatalogProgressText();
@@ -708,15 +734,22 @@ function restoreWorkerCatalog(data = {}) {
   for (const saved of savedItems) {
     const item = workerCatalogItems.find(row => row.code === saved?.code) || (saved?.code ? { code: saved.code, label: saved.label || "Tétel", unit: saved.unit || "tétel", usage_count: 0 } : null);
     const quantity = String(saved?.quantity || "").trim();
-    if (item && quantity) selectedWorkerCatalogItems.set(item.code, { ...item, quantity });
+    const customUnitPrice = String(saved?.customUnitPrice ?? "").trim();
+    if (item && quantity) selectedWorkerCatalogItems.set(item.code, { ...item, quantity, customUnitPrice });
   }
   renderWorkerCatalog();
 }
 
 function extraWorkerCatalogItems() {
   return [...selectedWorkerCatalogItems.values()]
-    .filter(item => !workerCatalogField(item.code))
-    .map(item => ({ code: item.code, label: item.label, unit: item.unit, quantity: item.quantity }));
+    .filter(item => !workerCatalogField(item.code) || String(item.customUnitPrice || "").trim())
+    .map(item => ({
+      code: item.code,
+      label: item.label,
+      unit: item.unit,
+      quantity: item.quantity,
+      ...(String(item.customUnitPrice || "").trim() ? { customUnitPrice: String(item.customUnitPrice).trim() } : {})
+    }));
 }
 
 async function loadWorkerCatalog(showErrors = false) {
@@ -793,16 +826,23 @@ function validateOtherItems() {
 
 function validateWorkerCatalogItems() {
   let firstInvalid = null;
-  for (const input of $("#workerSelectedItems").querySelectorAll("[data-worker-catalog-quantity]")) {
-    input.setCustomValidity("");
-    if (!workerCatalogQuantityIsValid(input.value)) {
-      input.setCustomValidity("Adj meg 0-nál nagyobb, legfeljebb három tizedesjegyű mennyiséget.");
-      firstInvalid ||= input;
+  for (const row of $("#workerSelectedItems").querySelectorAll("[data-worker-selected]")) {
+    const quantity = row.querySelector("[data-worker-catalog-quantity]");
+    const price = row.querySelector("[data-worker-catalog-price]");
+    quantity.setCustomValidity("");
+    price.setCustomValidity("");
+    if (!workerCatalogQuantityIsValid(quantity.value)) {
+      quantity.setCustomValidity("Adj meg 0-nál nagyobb, legfeljebb három tizedesjegyű mennyiséget.");
+      firstInvalid ||= quantity;
+    }
+    if (!workerCatalogCustomPriceIsValid(price.value)) {
+      price.setCustomValidity("Adj meg érvényes egyedi árat, legfeljebb két tizedesjeggyel, vagy hagyd üresen.");
+      firstInvalid ||= price;
     }
   }
   if (!firstInvalid) return true;
   firstInvalid.reportValidity();
-  showStatus("Ellenőrizd a kiválasztott tétel mennyiségét.");
+  showStatus("Ellenőrizd a kiválasztott tétel mennyiségét vagy egyedi árát.");
   return false;
 }
 
@@ -1073,7 +1113,8 @@ function filledMaterialItems(data) {
   for (const item of Array.isArray(data.catalogItems) ? data.catalogItems : []) {
     const label = workerCatalogLabel(item?.label || "Tétel");
     const quantity = String(item?.quantity || "").trim();
-    if (quantity) result.push(`${label}: ${quantity}${item?.unit ? ` ${item.unit}` : ""}`);
+    const legacyValue = item?.code ? String(data[item.code] || "").trim() : "";
+    if (quantity && !legacyValue) result.push(`${label}: ${quantity}${item?.unit ? ` ${item.unit}` : ""}`);
   }
   return result;
 }
@@ -2220,22 +2261,40 @@ $("#descriptionSuggestions").addEventListener("click", event => {
   vibrateWorkerCatalog(25);
 });
 $("#workerSelectedItems").addEventListener("input", event => {
-  const input = event.target.closest("[data-worker-catalog-quantity]");
+  const quantityInput = event.target.closest("[data-worker-catalog-quantity]");
+  const priceInput = event.target.closest("[data-worker-catalog-price]");
+  const input = quantityInput || priceInput;
   const row = input?.closest("[data-worker-selected]");
   const item = row && selectedWorkerCatalogItems.get(row.dataset.workerSelected);
   if (!input || !item) return;
-  item.quantity = input.value;
   input.setCustomValidity("");
-  const field = workerCatalogField(item.code);
-  if (field) field.value = input.value;
-  updateWorkerCatalogQuantityState(row, item);
+  if (quantityInput) {
+    item.quantity = quantityInput.value;
+    const field = workerCatalogField(item.code);
+    if (field) field.value = quantityInput.value;
+    updateWorkerCatalogQuantityState(row, item);
+  } else {
+    item.customUnitPrice = priceInput.value;
+    updateWorkerCatalogPriceState(row, item);
+  }
 });
 $("#workerSelectedItems").addEventListener("change", event => {
-  const input = event.target.closest("[data-worker-catalog-quantity]");
+  const quantityInput = event.target.closest("[data-worker-catalog-quantity]");
+  const priceInput = event.target.closest("[data-worker-catalog-price]");
+  const input = quantityInput || priceInput;
   const row = input?.closest("[data-worker-selected]");
   const item = row && selectedWorkerCatalogItems.get(row.dataset.workerSelected);
-  if (!input || !item || !updateWorkerCatalogQuantityState(row, item)) return;
-  workerCatalogFeedback(`${workerCatalogLabel(item.label)} mennyisége beírva: ${item.quantity} ${item.unit}.`);
+  if (!input || !item) return;
+  if (quantityInput) {
+    if (!updateWorkerCatalogQuantityState(row, item)) return;
+    workerCatalogFeedback(`${workerCatalogLabel(item.label)} mennyisége beírva: ${item.quantity} ${item.unit}.`);
+  } else {
+    if (!updateWorkerCatalogPriceState(row, item)) return;
+    const value = String(item.customUnitPrice || "").trim();
+    workerCatalogFeedback(value
+      ? `${workerCatalogLabel(item.label)} egyedi ára beírva. Az Iroda ellenőrzi az elszámolásban.`
+      : `${workerCatalogLabel(item.label)} az árlistás árral kerül az elszámolásba.`);
+  }
   vibrateWorkerCatalog(25);
 });
 $(".materials-section").addEventListener("change", event => {

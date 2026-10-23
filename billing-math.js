@@ -44,19 +44,28 @@
       result.push({label:label||'Egyéb tétel',quantity,unit:unit||'tétel',unitPrice,divisor:1,reviewed:false,sourceCode:code});
     }
     const catalogItems=Array.isArray(data.catalogItems)?data.catalogItems:[];
+    const catalogByCode=new Map(catalogItems.map(selected=>[String(selected?.code||'').trim(),selected]));
+    const catalogPrice=(selected,fallback)=>{
+      const text=String(selected?.customUnitPrice??'').trim();
+      if(!text)return{unitPrice:String(fallback??0),custom:false,valid:true};
+      try{return{unitPrice:decimal(text,2,100000000),custom:true,valid:true};}
+      catch(_){return{unitPrice:'0',custom:true,valid:false};}
+    };
     for(const selected of catalogItems){
       const code=String(selected?.code||'').trim(),quantityText=String(selected?.quantity||'').trim();
       if(!code||!quantityText||String(data[code]||'').trim())continue;
       const price=prices.find(item=>item.code===code),label=price?.label||String(selected?.label||'Tétel').trim()||'Tétel',unit=price?.unit||String(selected?.unit||'tétel').trim()||'tétel';
       let quantity='0',numeric=true;try{quantity=decimal(quantityText,3,1000000);}catch(_){numeric=false;}
-      result.push({label:label+(price?.active===false?' – kézi árazás szükséges':''),quantity,unit,unitPrice:String(price&&price.active!==false?price.unit_price:0),divisor:1,reviewed:Boolean(numeric&&price?.confirmed&&price.active!==false),sourceCode:code});
+      const applied=catalogPrice(selected,price&&price.active!==false?price.unit_price:0),suffix=!applied.custom&&price?.active===false?' – kézi árazás szükséges':'';
+      result.push({label:label+suffix,quantity,unit,unitPrice:applied.unitPrice,divisor:1,reviewed:Boolean(numeric&&applied.valid&&!applied.custom&&price?.confirmed&&price.active!==false),sourceCode:code,...(applied.custom?{customPrice:true}:{})});
     }
     for(const price of prices){
       if(price.code==='labor') continue;
       if(customCodesInUse.has(price.code)) continue;
       const value=String(data[price.code]||'').trim();if(!value) continue;
       let quantity='1',numeric=true;try{quantity=decimal(value,3,1000000);}catch(_){numeric=false;}
-      result.push({label:price.label+(numeric?'':': '+value)+(price.active===false?' – kézi árazás szükséges':''),quantity,unit:price.unit,unitPrice:String(price.active===false?0:price.unit_price),divisor:1,reviewed:numeric&&price.confirmed&&price.active!==false,sourceCode:price.code});
+      const applied=catalogPrice(catalogByCode.get(price.code),price.active===false?0:price.unit_price),suffix=!applied.custom&&price.active===false?' – kézi árazás szükséges':'';
+      result.push({label:price.label+(numeric?'':': '+value)+suffix,quantity,unit:price.unit,unitPrice:applied.unitPrice,divisor:1,reviewed:Boolean(numeric&&applied.valid&&!applied.custom&&price.confirmed&&price.active!==false),sourceCode:price.code,...(applied.custom?{customPrice:true}:{})});
     }
     const earth=Number(String(data.construction_3||'').replace(',','.'));
     const freight=prices.find(p=>p.code==='extra_earth_freight');
