@@ -12,7 +12,7 @@
   <link rel="apple-touch-icon" href="munkalap-m-icon-apple-180-v12.png">
   <link rel="stylesheet" href="styles.css?v=69">
   <link rel="stylesheet" href="logo-overrides.css?v=69">
-  <link rel="stylesheet" href="app-shell.css?v=83">
+  <link rel="stylesheet" href="app-shell.css?v=84">
   <title>Díszkertek – Napi munkalap</title>
   <meta name="description" content="Díszkertek napi munkalapok és ügyfélnyilvántartás.">
   <meta property="og:title" content="Díszkertek – Napi munkalap">
@@ -104,11 +104,13 @@
         </details>
 
         <section class="materials-section">
-          <h2>Anyag és fuvar</h2>
+          <h2>Tételek rögzítése</h2>
           <section id="workerCatalog" class="worker-catalog" aria-labelledby="workerCatalogTitle" hidden>
             <div class="worker-catalog-heading">
-              <h3 id="workerCatalogTitle">Anyag és fuvar rögzítése</h3>
+              <h3 id="workerCatalogTitle">Gyors tételválasztó</h3>
+              <small>Nem kötelező</small>
             </div>
+            <p class="worker-catalog-intro">Válassz a gyorsgombokkal, vagy keress rá egy tételre. A régi kitöltési módot is használhatod.</p>
             <ol class="worker-catalog-steps">
               <li>Válaszd ki a tételt.</li>
               <li>Írd be a mennyiséget. A „✓ Beírva a munkalapra” jelzi, hogy rendben van.</li>
@@ -117,7 +119,7 @@
             </ol>
             <p id="workerCatalogFeedback" class="worker-catalog-feedback" role="status" aria-live="polite" hidden></p>
             <details class="worker-catalog-panel worker-popular-panel">
-              <summary>Gyakran használt tételek</summary>
+              <summary>Gyorsgombok – gyakran használt tételek</summary>
               <small>Az elmúlt 90 nap alapján</small>
               <div id="workerPopularItems" class="worker-popular-items"></div>
             </details>
@@ -133,6 +135,7 @@
               <div id="workerCatalogSuggestions" class="worker-catalog-suggestions" hidden></div>
             </details>
           </section>
+          <p class="legacy-material-heading">Hagyományos kitöltés</p>
           <div class="material-columns">
             <div class="material-group"><h3>Kertkarbantartás</h3><div id="maintenanceItems"></div></div>
             <div class="material-group"><h3>Kertépítés / fuvarozás</h3><div id="constructionItems"></div></div>
@@ -353,9 +356,9 @@
   <script src="supabase.js?v=69"></script>
   <script src="supabase-config.js?v=69"></script>
   <script src="munkalap-data.js?v=76"></script>
-  <script src="app.js?v=83"></script>
-  <script src="billing-math.js?v=83"></script>
-  <script src="billing-settlements.js?v=83"></script>
+  <script src="app.js?v=84"></script>
+  <script src="billing-math.js?v=84"></script>
+  <script src="billing-settlements.js?v=84"></script>
   <script src="statistics-settlements.js?v=69"></script>
   <script src="munkalap-project-tracking.js?v=2"></script>
 </body>
