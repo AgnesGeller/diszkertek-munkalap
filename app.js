@@ -1,7 +1,7 @@
 const EMAIL_ENDPOINT = "https://formsubmit.co/info@diszkertek.hu";
 const EMAIL_RECIPIENT = "info@diszkertek.hu";
 const STABLE_APP_URL = "https://agnesgeller.github.io/diszkertek-munkalap/";
-const APP_VERSION = "81";
+const APP_VERSION = "82";
 const QUEUE_KEY = "diszkertek-munkalap-send-queue-v1";
 const MANAGER_VIEW_KEY = "diszkertek-munkalap-manager-view-v1";
 const DATABASE_FREE_LIMIT = 500 * 1024 * 1024;
@@ -261,7 +261,8 @@ function buildEmailPayload(data, modified = false) {
   CONSTRUCTION.forEach(([name, unit], index) => addMaterialToEmail(payload, "Kertépítés / fuvarozás", "construction", name, unit, index, data));
   for (const item of Array.isArray(data.catalogItems) ? data.catalogItems : []) {
     const quantity = String(item?.quantity || "").trim();
-    if (quantity) payload[`Tétel – ${String(item?.label || "Tétel").trim()}`] = `${quantity}${item?.unit ? ` ${item.unit}` : ""}`;
+    const legacyValue = item?.code ? String(data[item.code] || "").trim() : "";
+    if (quantity && !legacyValue) payload[`Tétel – ${String(item?.label || "Tétel").trim()}`] = `${quantity}${item?.unit ? ` ${item.unit}` : ""}`;
   }
   return payload;
 }
