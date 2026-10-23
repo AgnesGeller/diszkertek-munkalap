@@ -12,7 +12,7 @@
   <link rel="apple-touch-icon" href="munkalap-m-icon-apple-180-v12.png">
   <link rel="stylesheet" href="styles.css?v=69">
   <link rel="stylesheet" href="logo-overrides.css?v=69">
-  <link rel="stylesheet" href="app-shell.css?v=73">
+  <link rel="stylesheet" href="app-shell.css?v=76">
   <title>Díszkertek – Napi munkalap</title>
   <meta name="description" content="Díszkertek napi munkalapok és ügyfélnyilvántartás.">
   <meta property="og:title" content="Díszkertek – Napi munkalap">
@@ -100,6 +100,20 @@
 
         <section class="materials-section">
           <h2>Anyag és fuvar</h2>
+          <section id="workerCatalog" class="worker-catalog" aria-labelledby="workerCatalogTitle" hidden>
+            <div class="worker-catalog-heading">
+              <h3 id="workerCatalogTitle">Gyakran használt tételek</h3>
+              <small>Az elmúlt 90 nap alapján</small>
+            </div>
+            <div id="workerPopularItems" class="worker-popular-items"></div>
+            <details class="worker-catalog-search">
+              <summary>Más tétel keresése</summary>
+              <label for="workerCatalogSearch">Tétel neve</label>
+              <input id="workerCatalogSearch" type="search" autocomplete="off" placeholder="Írj be legalább 3 betűt" aria-controls="workerCatalogSuggestions" aria-expanded="false">
+              <div id="workerCatalogSuggestions" class="worker-catalog-suggestions" hidden></div>
+            </details>
+            <div id="workerSelectedItems" class="worker-selected-items"></div>
+          </section>
           <div class="material-columns">
             <div class="material-group"><h3>Kertkarbantartás</h3><div id="maintenanceItems"></div></div>
             <div class="material-group"><h3>Kertépítés / fuvarozás</h3><div id="constructionItems"></div></div>
@@ -319,10 +333,10 @@
 
   <script src="supabase.js?v=69"></script>
   <script src="supabase-config.js?v=69"></script>
-  <script src="munkalap-data.js?v=70"></script>
-  <script src="app.js?v=74"></script>
-  <script src="billing-math.js?v=74"></script>
-  <script src="billing-settlements.js?v=74"></script>
+  <script src="munkalap-data.js?v=76"></script>
+  <script src="app.js?v=76"></script>
+  <script src="billing-math.js?v=76"></script>
+  <script src="billing-settlements.js?v=76"></script>
   <script src="statistics-settlements.js?v=69"></script>
   <script src="munkalap-project-tracking.js?v=2"></script>
 </body>

@@ -36,4 +36,17 @@ assert.equal(math.hasUnpricedCustomItem([{sourceCode:'maintenance_21',quantity:'
 assert.equal(math.needsItemReview([{sourceCode:'maintenance_21',quantity:'1',unitPrice:'0',divisor:1}]),true);
 assert.equal(math.needsItemReview([{sourceCode:'maintenance_21',quantity:'1',unitPrice:'1500',divisor:1}]),false);
 assert.equal(math.needsItemReview([{sourceCode:'maintenance_0',quantity:'1',unitPrice:'0',divisor:1}]),false);
-console.log('PASS: person-minutes, multiple teams, decimal units, rounding, invalid inputs, provisional prices, separate earth freight, and custom items.');
+const catalog=[
+  {code:'a',label:'Ágyásszegély / pázsitszegély',active:true},
+  {code:'b',label:'Prémium díszkerítés',active:true},
+  {code:'c',label:'Régi ágyásszegély',active:false}
+];
+assert.deepEqual(math.catalogMatches(catalog,'ág'),[],'Három karakternél rövidebb keresés még ne adjon találatot.');
+assert.deepEqual(math.catalogMatches(catalog,'AGY').map(item=>item.code),['a'],'A keresés legyen ékezet- és kisbetűfüggetlen.');
+assert.deepEqual(math.catalogMatches(catalog,'szegély').map(item=>item.code),['a'],'Csak az aktív, a szöveget bárhol tartalmazó tételek jelenjenek meg.');
+const workerCatalogPrices=[...prices,{code:'extra_mulch',label:'Mulcs / fenyőkéreg',unit:'m³',unit_price:45000,confirmed:true,active:true}];
+items=math.build({data:{catalogItems:[{code:'extra_mulch',label:'A dolgozó által mentett név',unit:'rossz egység',quantity:'1,5'}]}},workerCatalogPrices);
+assert.deepEqual(items[0],{label:'Mulcs / fenyőkéreg',quantity:'1.5',unit:'m³',unitPrice:'45000',divisor:1,reviewed:true,sourceCode:'extra_mulch'},'A dolgozói tétel az irodai árlistából kapjon nevet, egységet és árat.');
+items=math.build({data:{catalogItems:[{code:'mar_nem_aktiv',label:'Régi tétel',unit:'db',quantity:'2'}]}},prices);
+assert.deepEqual(items[0],{label:'Régi tétel',quantity:'2',unit:'db',unitPrice:'0',divisor:1,reviewed:false,sourceCode:'mar_nem_aktiv'},'A már nem elérhető katalógustétel maradjon meg, de kérjen irodai árazást.');
+console.log('PASS: person-minutes, multiple teams, decimal units, rounding, invalid inputs, provisional prices, separate earth freight, custom items, and catalog search.');

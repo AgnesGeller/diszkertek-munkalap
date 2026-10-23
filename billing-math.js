@@ -43,6 +43,14 @@
       if(priceText)try{unitPrice=decimal(priceText,2,100000000);}catch(_){}
       result.push({label:label||'Egyéb tétel',quantity,unit:unit||'tétel',unitPrice,divisor:1,reviewed:false,sourceCode:code});
     }
+    const catalogItems=Array.isArray(data.catalogItems)?data.catalogItems:[];
+    for(const selected of catalogItems){
+      const code=String(selected?.code||'').trim(),quantityText=String(selected?.quantity||'').trim();
+      if(!code||!quantityText||String(data[code]||'').trim())continue;
+      const price=prices.find(item=>item.code===code),label=price?.label||String(selected?.label||'Tétel').trim()||'Tétel',unit=price?.unit||String(selected?.unit||'tétel').trim()||'tétel';
+      let quantity='0',numeric=true;try{quantity=decimal(quantityText,3,1000000);}catch(_){numeric=false;}
+      result.push({label:label+(price?.active===false?' – kézi árazás szükséges':''),quantity,unit,unitPrice:String(price&&price.active!==false?price.unit_price:0),divisor:1,reviewed:Boolean(numeric&&price?.confirmed&&price.active!==false),sourceCode:code});
+    }
     for(const price of prices){
       if(price.code==='labor') continue;
       if(customCodesInUse.has(price.code)) continue;
@@ -63,6 +71,12 @@
   function hasLowValueItem(items){return (items||[]).some(item=>{try{const value=total([item]);return value>0&&value<1000;}catch(_){return false;}});}
   function hasUnpricedCustomItem(items){return (items||[]).some(item=>customItemCodes.includes(item.sourceCode)&&!(Number(item.unitPrice)>0));}
   function needsItemReview(items){return hasLowValueItem(items)||hasUnpricedCustomItem(items);}
-  const api={decimal,total,minutes,build,hasLowValueItem,hasUnpricedCustomItem,needsItemReview};
+  function catalogMatches(prices,query){
+    const normalize=value=>String(value??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+    const needle=normalize(query);
+    if(needle.length<3)return [];
+    return (prices||[]).filter(price=>price.active!==false&&normalize(price.label).includes(needle));
+  }
+  const api={decimal,total,minutes,build,hasLowValueItem,hasUnpricedCustomItem,needsItemReview,catalogMatches};
   if(typeof module==='object'&&module.exports) module.exports=api;else root.BillingMath=api;
 })(typeof window==='undefined'?globalThis:window);

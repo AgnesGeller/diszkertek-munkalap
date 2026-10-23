@@ -11,6 +11,7 @@
 - A bevétel minden esetben a munkalapokból és a hozzájuk mentett elszámolásokból készül.
 - Állapotok: Piszkozat, Ellenőrizve, Elküldve, Kifizetve. PDF és előre kitöltött e-mail csak mentett, nem piszkozat állapotból készülhet.
 - A statisztika dátum, ügyfél, helyszín és állapot szerint szűrhető. A dolgozói felület árakat, elszámolást és statisztikát nem kap.
+- A `worker_catalog()` kizárólag kódot, megnevezést, mértékegységet és 90 napos használati gyakoriságot ad vissza. Árat nem ad át a dolgozói böngészőnek; névtelenül nem hívható, és belépve is csak Munkalap-profillal működik.
 
 ## Ellenőrzés
 
@@ -18,4 +19,4 @@
 
 `billing-security-test.sql`: integrációs teszt üres elszámolású munkalappal; minden tesztmódosítás rollbackkel zárul. Ági/Tamás olvasás, dolgozói/anon tiltás, szerveroldali számítás és ellenőrizetlen árak tesztje.
 
-A projekt Supabase-ellenőrzője nem jelzett új figyelmeztetést a két billing táblára. A már meglévő, közös projektben jelzett Auth- és `public.is_manager` figyelmeztetések nem részei ennek a változtatásnak; más alkalmazás jogosultságait itt nem módosítjuk. [Supabase jogosultsági figyelmeztetések](https://supabase.com/docs/guides/database/database-linter?lint=0028_anon_security_definer_function_executable).
+A Supabase általános szabálya jelzi, hogy a belépett felhasználók meghívhatják a `worker_catalog()` biztonsági jogosultsággal futó végpontot. Ez ennél a végpontnál szándékos: a függvény külön ellenőrzi a `munkalap.profiles` tagságot, és csak ár nélküli katalógusadatot ad vissza. A névtelen szerepkör végrehajtási joga vissza van vonva. A közös projekt más sémáiban jelzett figyelmeztetések nem részei ennek a változtatásnak. [Supabase jogosultsági figyelmeztetések](https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable).

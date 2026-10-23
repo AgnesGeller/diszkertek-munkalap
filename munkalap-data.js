@@ -660,6 +660,17 @@
       return data;
     },
 
+    async workerCatalog() {
+      if (previewMode) {
+        return previewPrices
+          .filter(item => item.active !== false && item.code !== "labor" && item.code !== "extra_earth_freight")
+          .map(item => ({ code: item.code, label: item.label, unit: item.unit, usage_count: 0 }));
+      }
+      const { data, error } = await client.rpc("worker_catalog");
+      if (error) throw error;
+      return data || [];
+    },
+
     async saveBillingPrice(price) {
       if (previewMode) {
         if (previewProfile?.role !== 'manager') throw new Error('Nincs jogosultság.');

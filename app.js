@@ -1,7 +1,7 @@
 const EMAIL_ENDPOINT = "https://formsubmit.co/info@diszkertek.hu";
 const EMAIL_RECIPIENT = "info@diszkertek.hu";
 const STABLE_APP_URL = "https://agnesgeller.github.io/diszkertek-munkalap/";
-const APP_VERSION = "74";
+const APP_VERSION = "76";
 const QUEUE_KEY = "diszkertek-munkalap-send-queue-v1";
 const MANAGER_VIEW_KEY = "diszkertek-munkalap-manager-view-v1";
 const DATABASE_FREE_LIMIT = 500 * 1024 * 1024;
@@ -66,6 +66,8 @@ let customersLoading = null;
 let selectedCustomerId = null;
 let selectedLocationId = null;
 let handlingAppHistory = false;
+let workerCatalogItems = [];
+const selectedWorkerCatalogItems = new Map();
 
 function pushAppHistory(view = managerView, detail = "") {
   if (!session || handlingAppHistory) return;
@@ -257,6 +259,10 @@ function buildEmailPayload(data, modified = false) {
   addIfFilled(payload, "Feladat leírás / megjegyzés", data.description);
   MAINTENANCE.forEach(([name, unit], index) => addMaterialToEmail(payload, "Kertkarbantartás", "maintenance", name, unit, index, data));
   CONSTRUCTION.forEach(([name, unit], index) => addMaterialToEmail(payload, "Kertépítés / fuvarozás", "construction", name, unit, index, data));
+  for (const item of Array.isArray(data.catalogItems) ? data.catalogItems : []) {
+    const quantity = String(item?.quantity || "").trim();
+    if (quantity) payload[`Tétel – ${String(item?.label || "Tétel").trim()}`] = `${quantity}${item?.unit ? ` ${item.unit}` : ""}`;
+  }
   return payload;
 }
 
@@ -548,11 +554,119 @@ function resetForm(options = {}) {
     fallbackEmailContext = null;
     fallbackEmailButton.hidden = true;
   }
+  resetWorkerCatalog();
   updateQueueNotice();
 }
 
 function searchKey(value) {
   return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().replace(/\s+/g, " ").toLocaleLowerCase("hu-HU");
+}
+
+function workerCatalogLabel(value) {
+  return String(value || "").replace(/^(Fenntartás|Építés\s*\/\s*fuvarozás)\s*[–-]\s*/i, "");
+}
+
+function workerCatalogField(code) {
+  const field = form.elements[code];
+  return field && typeof field.value === "string" ? field : null;
+}
+
+function renderWorkerCatalogSuggestions() {
+  const input = $("#workerCatalogSearch");
+  const target = $("#workerCatalogSuggestions");
+  const query = searchKey(input.value);
+  const matches = query.length < 3
+    ? []
+    : workerCatalogItems.filter(item => searchKey(item.label).includes(query));
+  target.innerHTML = matches.map(item => `<button type="button" data-worker-catalog-add="${escapeHTML(item.code)}"><b>${escapeHTML(workerCatalogLabel(item.label))}</b><small>${escapeHTML(item.unit)}</small></button>`).join("");
+  target.hidden = !matches.length;
+  input.setAttribute("aria-expanded", String(Boolean(matches.length)));
+}
+
+function renderWorkerSelectedItems() {
+  const target = $("#workerSelectedItems");
+  target.innerHTML = [...selectedWorkerCatalogItems.values()].map(item => `<div class="worker-selected-item" data-worker-selected="${escapeHTML(item.code)}"><span>${escapeHTML(workerCatalogLabel(item.label))}</span><label>Mennyiség (${escapeHTML(item.unit)})<input data-worker-catalog-quantity type="text" inputmode="decimal" pattern="[0-9]+([,.][0-9]{1,3})?" maxlength="20" value="${escapeHTML(item.quantity)}" aria-label="${escapeHTML(workerCatalogLabel(item.label))} mennyisége"></label><button type="button" data-worker-catalog-remove="${escapeHTML(item.code)}">Törlés</button></div>`).join("");
+  for (const button of $("#workerPopularItems").querySelectorAll("[data-worker-catalog-add]")) {
+    button.setAttribute("aria-pressed", String(selectedWorkerCatalogItems.has(button.dataset.workerCatalogAdd)));
+  }
+}
+
+function renderWorkerCatalog() {
+  const section = $("#workerCatalog");
+  if (!workerCatalogItems.length && !selectedWorkerCatalogItems.size) {
+    section.hidden = true;
+    return;
+  }
+  const used = workerCatalogItems.filter(item => Number(item.usage_count) > 0);
+  const popular = (used.length ? used : workerCatalogItems).slice(0, 10);
+  $("#workerPopularItems").innerHTML = popular.map(item => `<button type="button" data-worker-catalog-add="${escapeHTML(item.code)}" aria-pressed="${selectedWorkerCatalogItems.has(item.code)}"><span>${escapeHTML(workerCatalogLabel(item.label))}</span></button>`).join("");
+  $("#workerPopularItems").hidden = !workerCatalogItems.length;
+  $("#workerCatalogSearch").closest("details").hidden = !workerCatalogItems.length;
+  section.hidden = false;
+  renderWorkerSelectedItems();
+  renderWorkerCatalogSuggestions();
+}
+
+function addWorkerCatalogItem(code) {
+  const item = workerCatalogItems.find(row => row.code === code);
+  if (!item) return;
+  if (!selectedWorkerCatalogItems.has(code)) {
+    const field = workerCatalogField(code);
+    const quantity = String(field?.value || "").trim() || "1";
+    selectedWorkerCatalogItems.set(code, { ...item, quantity });
+    if (field) field.value = quantity;
+  }
+  formDirty = true;
+  renderWorkerSelectedItems();
+}
+
+function removeWorkerCatalogItem(code) {
+  selectedWorkerCatalogItems.delete(code);
+  const field = workerCatalogField(code);
+  if (field) field.value = "";
+  formDirty = true;
+  renderWorkerSelectedItems();
+}
+
+function resetWorkerCatalog() {
+  selectedWorkerCatalogItems.clear();
+  if ($("#workerCatalogSearch")) $("#workerCatalogSearch").value = "";
+  if ($("#workerCatalogSuggestions")) $("#workerCatalogSuggestions").hidden = true;
+  renderWorkerCatalog();
+}
+
+function restoreWorkerCatalog(data = {}) {
+  selectedWorkerCatalogItems.clear();
+  for (const item of workerCatalogItems) {
+    const quantity = String(data[item.code] || "").trim();
+    if (quantity) selectedWorkerCatalogItems.set(item.code, { ...item, quantity });
+  }
+  const savedItems = Array.isArray(data.catalogItems) ? data.catalogItems : [];
+  for (const saved of savedItems) {
+    const item = workerCatalogItems.find(row => row.code === saved?.code) || (saved?.code ? { code: saved.code, label: saved.label || "Tétel", unit: saved.unit || "tétel", usage_count: 0 } : null);
+    const quantity = String(saved?.quantity || "").trim();
+    if (item && quantity) selectedWorkerCatalogItems.set(item.code, { ...item, quantity });
+  }
+  renderWorkerCatalog();
+}
+
+function extraWorkerCatalogItems() {
+  return [...selectedWorkerCatalogItems.values()]
+    .filter(item => !workerCatalogField(item.code))
+    .map(item => ({ code: item.code, label: item.label, unit: item.unit, quantity: item.quantity }));
+}
+
+async function loadWorkerCatalog(showErrors = false) {
+  try {
+    workerCatalogItems = await MunkalapDB.workerCatalog();
+    renderWorkerCatalog();
+    return true;
+  } catch (error) {
+    workerCatalogItems = [];
+    $("#workerCatalog").hidden = true;
+    if (showErrors) showStatus(`A gyors tétellista most nem tölthető be: ${error?.message || "ismeretlen hiba"}. A hagyományos lista továbbra is használható.`);
+    return false;
+  }
 }
 
 function customerNameKey(value) {
@@ -614,6 +728,22 @@ function validateOtherItems() {
   return false;
 }
 
+function validateWorkerCatalogItems() {
+  let firstInvalid = null;
+  for (const input of $("#workerSelectedItems").querySelectorAll("[data-worker-catalog-quantity]")) {
+    input.setCustomValidity("");
+    const value = input.value.trim().replace(",", ".");
+    if (!/^\d+(?:\.\d{1,3})?$/.test(value) || Number(value) <= 0 || Number(value) > 1000000) {
+      input.setCustomValidity("Adj meg 0-nál nagyobb, legfeljebb három tizedesjegyű mennyiséget.");
+      firstInvalid ||= input;
+    }
+  }
+  if (!firstInvalid) return true;
+  firstInvalid.reportValidity();
+  showStatus("Ellenőrizd a kiválasztott tétel mennyiségét.");
+  return false;
+}
+
 function separateWorksheetIdentity() {
   if (!editingId || pendingCurrentQueueId) return false;
   const original = worksheets.find(item => item.id === editingId);
@@ -644,6 +774,7 @@ function separateWorksheetIdentity() {
 
 function worksheetFromForm(existing) {
   const data = formDataObject();
+  data.catalogItems = extraWorkerCatalogItems();
   const customer = customerDirectory.find(item => customerNameKey(item.fullName) === customerNameKey(data.customerName));
   data.customerName = customer?.fullName || String(data.customerName || "").trim().replace(/\s+/g, " ").replace(/ zoli$/i, " Zoltán");
   const location = customer?.locations?.find(item => searchKey(item.address) === searchKey(data.address));
@@ -675,7 +806,7 @@ function updateWorksheetCache(saved) {
 form.addEventListener("submit", async event => {
   event.preventDefault();
   separateWorksheetIdentity();
-  if (!session || !validateOtherItems() || !validateTeamRows() || !form.reportValidity()) return;
+  if (!session || !validateOtherItems() || !validateWorkerCatalogItems() || !validateTeamRows() || !form.reportValidity()) return;
   if (pendingCurrentQueueId) {
     showStatus("Ez a munkalap már küldésre vár. Nem mentettük el még egyszer.", "pending");
     return;
@@ -877,6 +1008,11 @@ function filledMaterialItems(data) {
       }
     } else if (value) result.push(`${name}: ${value}${unit ? ` ${unit}` : ""}`);
   });
+  for (const item of Array.isArray(data.catalogItems) ? data.catalogItems : []) {
+    const label = workerCatalogLabel(item?.label || "Tétel");
+    const quantity = String(item?.quantity || "").trim();
+    if (quantity) result.push(`${label}: ${quantity}${item?.unit ? ` ${item.unit}` : ""}`);
+  }
   return result;
 }
 
@@ -1473,6 +1609,7 @@ function fillFormFromWorksheet(item, returnView = "") {
   form.elements.date.value = formatHungarianDate(item.date);
   form.elements.customerName.value = item.customer;
   form.elements.address.value = item.address;
+  restoreWorkerCatalog(item.data || {});
   selectedCustomerId = item.customerId || null;
   selectedLocationId = item.locationId || null;
   form.querySelector(".submit-button").textContent = "Módosítás mentése";
@@ -1844,6 +1981,7 @@ async function openApp(profile) {
   }
   const now = new Date();
   $("#archiveReminder").hidden = !(now.getMonth() === 11 && now.getDate() >= 10);
+  await loadWorkerCatalog(false);
   await loadWorksheets();
   await loadCustomers(profile.role === "manager", false);
   handlingAppHistory = true;
@@ -1877,6 +2015,9 @@ async function logout() {
   customersLoaded = false;
   customersLoading = null;
   customerDirectory = [];
+  workerCatalogItems = [];
+  selectedWorkerCatalogItems.clear();
+  $("#workerCatalog").hidden = true;
   $("#appView").hidden = true;
   $("#loginView").hidden = false;
   selectedProfile = canSwitchProfile ? "" : previousSession?.name || "";
@@ -1962,6 +2103,37 @@ $("#newWorksheet").addEventListener("click", () => {
   resetForm();
   if (updateReloadPending) { window.location.reload(); return; }
   window.scrollTo({ top: 0, behavior: "smooth" });
+});
+$("#workerCatalogSearch").addEventListener("input", renderWorkerCatalogSuggestions);
+$("#workerCatalog").addEventListener("click", event => {
+  const add = event.target.closest("[data-worker-catalog-add]");
+  const remove = event.target.closest("[data-worker-catalog-remove]");
+  if (add) {
+    addWorkerCatalogItem(add.dataset.workerCatalogAdd);
+    if (add.closest("#workerCatalogSuggestions")) {
+      $("#workerCatalogSearch").value = "";
+      renderWorkerCatalogSuggestions();
+    }
+  }
+  if (remove) removeWorkerCatalogItem(remove.dataset.workerCatalogRemove);
+});
+$("#workerSelectedItems").addEventListener("input", event => {
+  const input = event.target.closest("[data-worker-catalog-quantity]");
+  const row = input?.closest("[data-worker-selected]");
+  const item = row && selectedWorkerCatalogItems.get(row.dataset.workerSelected);
+  if (!input || !item) return;
+  item.quantity = input.value;
+  input.setCustomValidity("");
+  const field = workerCatalogField(item.code);
+  if (field) field.value = input.value;
+});
+$(".materials-section").addEventListener("change", event => {
+  const item = workerCatalogItems.find(row => row.code === event.target.name);
+  if (!item || event.target.closest("#workerCatalog")) return;
+  const quantity = String(event.target.value || "").trim();
+  if (quantity) selectedWorkerCatalogItems.set(item.code, { ...item, quantity });
+  else selectedWorkerCatalogItems.delete(item.code);
+  renderWorkerSelectedItems();
 });
 form.addEventListener("input", () => { formDirty = true; });
 $("#teams").addEventListener("input", event => event.target.setCustomValidity?.(""));
