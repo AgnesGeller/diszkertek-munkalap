@@ -1,7 +1,7 @@
 const EMAIL_ENDPOINT = "https://formsubmit.co/info@diszkertek.hu";
 const EMAIL_RECIPIENT = "info@diszkertek.hu";
 const STABLE_APP_URL = "https://agnesgeller.github.io/diszkertek-munkalap/";
-const APP_VERSION = "76";
+const APP_VERSION = "77";
 const QUEUE_KEY = "diszkertek-munkalap-send-queue-v1";
 const MANAGER_VIEW_KEY = "diszkertek-munkalap-manager-view-v1";
 const DATABASE_FREE_LIMIT = 500 * 1024 * 1024;
@@ -581,6 +581,26 @@ function renderWorkerCatalogSuggestions() {
   target.innerHTML = matches.map(item => `<button type="button" data-worker-catalog-add="${escapeHTML(item.code)}"><b>${escapeHTML(workerCatalogLabel(item.label))}</b><small>${escapeHTML(item.unit)}</small></button>`).join("");
   target.hidden = !matches.length;
   input.setAttribute("aria-expanded", String(Boolean(matches.length)));
+}
+
+function workerCatalogFamily(item) {
+  const familyName = searchKey(workerCatalogLabel(item?.label)).split(" ")[0];
+  if (!familyName) return [];
+  return workerCatalogItems.filter(candidate => {
+    const candidateName = searchKey(workerCatalogLabel(candidate.label));
+    return candidateName === familyName || candidateName.startsWith(`${familyName} `);
+  });
+}
+
+function showWorkerCatalogFamily(item) {
+  const family = workerCatalogFamily(item);
+  if (family.length < 2) return false;
+  const details = $("#workerCatalogSearch").closest("details");
+  details.open = true;
+  $("#workerCatalogSearch").value = workerCatalogLabel(item.label).trim().split(/\s+/)[0];
+  renderWorkerCatalogSuggestions();
+  details.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  return true;
 }
 
 function renderWorkerSelectedItems() {
@@ -2109,8 +2129,15 @@ $("#workerCatalog").addEventListener("click", event => {
   const add = event.target.closest("[data-worker-catalog-add]");
   const remove = event.target.closest("[data-worker-catalog-remove]");
   if (add) {
-    addWorkerCatalogItem(add.dataset.workerCatalogAdd);
-    if (add.closest("#workerCatalogSuggestions")) {
+    const code = add.dataset.workerCatalogAdd;
+    const isPopularItem = Boolean(add.closest("#workerPopularItems"));
+    if (isPopularItem && selectedWorkerCatalogItems.has(code)) {
+      removeWorkerCatalogItem(code);
+    } else {
+      const item = workerCatalogItems.find(row => row.code === code);
+      if (!isPopularItem || !showWorkerCatalogFamily(item)) addWorkerCatalogItem(code);
+    }
+    if (!isPopularItem) {
       $("#workerCatalogSearch").value = "";
       renderWorkerCatalogSuggestions();
     }
