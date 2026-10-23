@@ -1,7 +1,7 @@
 const EMAIL_ENDPOINT = "https://formsubmit.co/info@diszkertek.hu";
 const EMAIL_RECIPIENT = "info@diszkertek.hu";
 const STABLE_APP_URL = "https://agnesgeller.github.io/diszkertek-munkalap/";
-const APP_VERSION = "86";
+const APP_VERSION = "87";
 const QUEUE_KEY = "diszkertek-munkalap-send-queue-v1";
 const MANAGER_VIEW_KEY = "diszkertek-munkalap-manager-view-v1";
 const DATABASE_FREE_LIMIT = 500 * 1024 * 1024;
@@ -102,6 +102,7 @@ let selectedCustomerId = null;
 let selectedLocationId = null;
 let handlingAppHistory = false;
 let workerCatalogItems = [];
+let descriptionHistory = [];
 const selectedWorkerCatalogItems = new Map();
 
 function pushAppHistory(view = managerView, detail = "") {
@@ -966,6 +967,7 @@ function updateWorksheetCache(saved) {
   if (index >= 0) worksheets[index] = saved;
   else worksheets.unshift(saved);
   renderAll();
+  loadDescriptionHistory();
 }
 
 form.addEventListener("submit", async event => {
@@ -1253,7 +1255,7 @@ function renderRecent() {
   const target = $("#recentWorksheets");
   const recent = ownRecentWorksheets();
   target.innerHTML = recent.length ? recent.map(item => worksheetCardHTML(item)).join("") : `<p class="empty-list">Még nincs beküldött munkalapod.</p>`;
-  renderDescriptionSuggestions(recent);
+  renderDescriptionSuggestions(descriptionHistory.length ? descriptionHistory : recent);
 }
 
 function renderDescriptionSuggestions(recent = ownRecentWorksheets()) {
@@ -1764,6 +1766,19 @@ async function loadWorksheets(showErrors = true) {
   }
 }
 
+async function loadDescriptionHistory() {
+  if (!session) return;
+  const userId = session.userId;
+  try {
+    const history = await MunkalapDB.listDescriptionHistory(userId);
+    if (session?.userId !== userId) return;
+    descriptionHistory = history;
+    renderDescriptionSuggestions(descriptionHistory.length ? descriptionHistory : ownRecentWorksheets());
+  } catch (_) {
+    // A legutóbbi munkalapokból származó ajánlások hálózati hiba esetén is megmaradnak.
+  }
+}
+
 async function loadOfficeWorksheets(showErrors = true) {
   if (session?.role !== "manager" || officeLoading) return false;
   officeLoading = true;
@@ -2148,6 +2163,7 @@ async function openApp(profile) {
   customersLoaded = false;
   customersLoading = null;
   customerDirectory = [];
+  descriptionHistory = [];
   $("#loginView").hidden = true;
   $("#appView").hidden = false;
   $("#activeUser").textContent = "";
@@ -2169,9 +2185,12 @@ async function openApp(profile) {
   }
   const now = new Date();
   $("#archiveReminder").hidden = !(now.getMonth() === 11 && now.getDate() >= 10);
-  await loadWorkerCatalog(false);
-  await loadWorksheets();
-  await loadCustomers(profile.role === "manager", false);
+  await Promise.all([
+    loadWorkerCatalog(false),
+    loadWorksheets(),
+    loadCustomers(profile.role === "manager", false)
+  ]);
+  loadDescriptionHistory();
   handlingAppHistory = true;
   if (profile.role === "manager") setManagerView(initialManagerView, { skipHistory: true });
   history.replaceState({ munkalapApp: true, view: profile.role === "manager" ? initialManagerView : "worksheet", detail: "" }, "");
@@ -2257,7 +2276,7 @@ $("#reloadHistory").addEventListener("click", async () => {
       return;
     }
     await syncQueue();
-    await loadWorksheets();
+    await Promise.all([loadWorksheets(), loadDescriptionHistory()]);
     updateQueueNotice();
     const waiting = ownQueue().length;
     if (waiting && (session.role === "manager" || session.delegatedBy)) {

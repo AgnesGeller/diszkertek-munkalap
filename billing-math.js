@@ -77,7 +77,8 @@
     }
     return result;
   }
-  function hasLowValueItem(items){return (items||[]).some(item=>{try{const value=total([item]);return value>0&&value<1000;}catch(_){return false;}});}
+  function itemNeedsPriceReview(item){try{return total([item])<=1000;}catch(_){return false;}}
+  function hasLowValueItem(items){return (items||[]).some(itemNeedsPriceReview);}
   function hasUnpricedCustomItem(items){return (items||[]).some(item=>customItemCodes.includes(item.sourceCode)&&!(Number(item.unitPrice)>0));}
   function needsItemReview(items){return hasLowValueItem(items)||hasUnpricedCustomItem(items);}
   function catalogMatches(prices,query){
@@ -86,6 +87,6 @@
     if(needle.length<3)return [];
     return (prices||[]).filter(price=>price.active!==false&&normalize(price.label).includes(needle));
   }
-  const api={decimal,total,minutes,build,hasLowValueItem,hasUnpricedCustomItem,needsItemReview,catalogMatches};
+  const api={decimal,total,minutes,build,itemNeedsPriceReview,hasLowValueItem,hasUnpricedCustomItem,needsItemReview,catalogMatches};
   if(typeof module==='object'&&module.exports) module.exports=api;else root.BillingMath=api;
 })(typeof window==='undefined'?globalThis:window);

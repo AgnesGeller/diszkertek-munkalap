@@ -32,12 +32,13 @@ assert.deepEqual(items[0],{label:'Szabad megnevezés',quantity:'1',unit:'tétel'
 items=math.build({data:{maintenance_21_price:'500'}},prices);
 assert.deepEqual(items[0],{label:'Egyéb tétel',quantity:'1',unit:'tétel',unitPrice:'500',divisor:1,reviewed:false,sourceCode:'maintenance_21'});
 assert.equal(math.hasLowValueItem([{quantity:'1',unitPrice:'999.99',divisor:1}]),true);
-assert.equal(math.hasLowValueItem([{quantity:'1',unitPrice:'1000',divisor:1}]),false);
-assert.equal(math.hasLowValueItem([{quantity:'1',unitPrice:'0',divisor:1}]),false);
+assert.equal(math.hasLowValueItem([{quantity:'1',unitPrice:'1000',divisor:1}]),true);
+assert.equal(math.hasLowValueItem([{quantity:'1',unitPrice:'0',divisor:1}]),true);
+assert.equal(math.hasLowValueItem([{quantity:'1',unitPrice:'1000.01',divisor:1}]),false);
 assert.equal(math.hasUnpricedCustomItem([{sourceCode:'maintenance_21',quantity:'1',unitPrice:'0',divisor:1}]),true);
 assert.equal(math.needsItemReview([{sourceCode:'maintenance_21',quantity:'1',unitPrice:'0',divisor:1}]),true);
 assert.equal(math.needsItemReview([{sourceCode:'maintenance_21',quantity:'1',unitPrice:'1500',divisor:1}]),false);
-assert.equal(math.needsItemReview([{sourceCode:'maintenance_0',quantity:'1',unitPrice:'0',divisor:1}]),false);
+assert.equal(math.needsItemReview([{sourceCode:'maintenance_0',quantity:'1',unitPrice:'0',divisor:1}]),true);
 const catalog=[
   {code:'a',label:'Ágyásszegély / pázsitszegély',active:true},
   {code:'b',label:'Prémium díszkerítés',active:true},

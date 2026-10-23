@@ -358,6 +358,37 @@
       return data.map(mapWorksheet);
     },
 
+    async listDescriptionHistory(userId) {
+      if (previewMode) {
+        if (!previewProfile) return [];
+        return previewWorksheets
+          .filter(item => item.userId === previewProfile.userId)
+          .slice(0, 100)
+          .map(item => ({
+            data: { description: String(item.data?.description || "") },
+            date: item.date,
+            createdAt: item.createdAt
+          }));
+      }
+      const { data: authData, error: authError } = await client.auth.getUser();
+      if (authError || !authData?.user) {
+        throw authError || new Error("Nincs aktív belépés.");
+      }
+      const { data, error } = await client
+        .from("worksheets")
+        .select("form_data,work_date,created_at")
+        .eq("user_id", userId || authData.user.id)
+        .order("work_date", { ascending: false })
+        .order("created_at", { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      return data.map(row => ({
+        data: { description: String(row.form_data?.description || "") },
+        date: row.work_date,
+        createdAt: row.created_at
+      }));
+    },
+
     async listAll() {
       if (previewMode) {
         if (previewProfile?.role !== "manager") throw new Error("Nincs jogosultság.");
