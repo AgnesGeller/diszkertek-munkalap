@@ -22,11 +22,12 @@ const unrelated = { data: { _officeStatus: 'database_delayed' } };
 assert.equal(context.clearEmailFallbackStatus(unrelated), false);
 assert.equal(unrelated.data._officeStatus, 'database_delayed');
 
-assert.match(source, /https:\/\/formsubmit\.co\/ajax\/info@diszkertek\.hu/);
-assert.match(source, /"Content-Type": "application\/json"/);
-assert.match(source, /body: JSON\.stringify\(payload \|\| \{\}\)/);
-assert.match(source, /result\?\.success === true/);
-assert.match(source, /A FormSubmit nem igazolta vissza az e-mail elküldését/);
+assert.match(source, /https:\/\/formsubmit\.co\/info@diszkertek\.hu/);
+assert.match(source, /formElement\.method = "POST"/);
+assert.match(source, /formElement\.target = frameName/);
+assert.match(source, /formElement\.submit\(\)/);
+assert.match(source, /setTimeout\(\(\) => \{[\s\S]*?frame\.remove\(\);[\s\S]*?60000\)/);
+assert.doesNotMatch(source, /await fetch\(EMAIL_ENDPOINT/);
 assert.match(source, /item\.emailRetryStopped = true/);
 assert.match(source, /!item\.emailRetryStopped && !fallbackDecisionPending/);
 assert.match(source, /Az e-mailt az alkalmazás nem küldi el újra automatikusan/);
