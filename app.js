@@ -1,9 +1,10 @@
 const EMAIL_ENDPOINT = "https://formsubmit.co/info@diszkertek.hu";
 const EMAIL_RECIPIENT = "info@diszkertek.hu";
 const STABLE_APP_URL = "https://agnesgeller.github.io/diszkertek-munkalap/";
-const APP_VERSION = "88";
+const APP_VERSION = "89";
 const QUEUE_KEY = "diszkertek-munkalap-send-queue-v1";
 const MANAGER_VIEW_KEY = "diszkertek-munkalap-manager-view-v1";
+const DESCRIPTION_HISTORY_KEY = "diszkertek-munkalap-description-history-v1";
 const DATABASE_FREE_LIMIT = 500 * 1024 * 1024;
 const LEADERS = ["Ádám", "Ági", "Attila", "Bendegúz", "Gábor", "Márk", "Tamás"];
 const LOCAL_PREVIEW = Boolean(window.MunkalapDB?.previewMode);
@@ -103,6 +104,7 @@ let selectedLocationId = null;
 let handlingAppHistory = false;
 let workerCatalogItems = [];
 let descriptionHistory = [];
+let descriptionHistoryLoaded = false;
 const selectedWorkerCatalogItems = new Map();
 
 function pushAppHistory(view = managerView, detail = "") {
@@ -164,6 +166,64 @@ function uuid() {
     const random = Math.random() * 16 | 0;
     return (character === "x" ? random : (random & 3 | 8)).toString(16);
   });
+}
+
+function descriptionHistoryStorageKey(userId) {
+  return `${DESCRIPTION_HISTORY_KEY}:${encodeURIComponent(String(userId || ""))}`;
+}
+
+function readStoredDescriptionHistory(userId) {
+  try {
+    const saved = JSON.parse(localStorage.getItem(descriptionHistoryStorageKey(userId)) || "null");
+    if (!saved?.initialized || !Array.isArray(saved.items)) return null;
+    return saved.items.slice(0, 100);
+  } catch (_) {
+    return null;
+  }
+}
+
+function writeStoredDescriptionHistory(userId, items) {
+  try {
+    localStorage.setItem(descriptionHistoryStorageKey(userId), JSON.stringify({
+      initialized: true,
+      items: items.slice(0, 100)
+    }));
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+function aggregateDescriptionHistory(items) {
+  const grouped = new Map();
+  items.forEach((item, index) => {
+    const description = String(item?.data?.description || "").trim().replace(/\s+/g, " ");
+    const key = description.toLocaleLowerCase("hu-HU");
+    if (!key) return;
+    const lastUsedAt = item.lastUsedAt || item.updatedAt || item.createdAt || item.date || "";
+    const current = grouped.get(key);
+    if (current) {
+      current.descriptionCount += Number(item.descriptionCount) || 1;
+      if (String(lastUsedAt) > String(current.lastUsedAt)) {
+        current.data.description = description;
+        current.lastUsedAt = lastUsedAt;
+      }
+      return;
+    }
+    grouped.set(key, {
+      id: item.id || `local-description-${uuid()}`,
+      data: { description },
+      descriptionCount: Number(item.descriptionCount) || 1,
+      lastUsedAt,
+      firstIndex: index
+    });
+  });
+  return [...grouped.values()]
+    .sort((first, second) => second.descriptionCount - first.descriptionCount
+      || String(second.lastUsedAt).localeCompare(String(first.lastUsedAt))
+      || first.firstIndex - second.firstIndex)
+    .slice(0, 100)
+    .map(({ firstIndex, ...item }) => item);
 }
 
 function isoToday() {
@@ -525,6 +585,7 @@ async function syncQueue() {
             : MunkalapDB.create(item.record, item.record.userId);
           await withTimeout(databaseTask, 12000, "Az adatbázis-kapcsolat túl sokáig várakozott.");
           item.databaseSaved = true;
+          rememberOwnDescription(item.record);
           changed = true;
         } catch (error) {
           item.lastError = error?.message || "Mentési hiba";
@@ -968,7 +1029,32 @@ function updateWorksheetCache(saved) {
   if (index >= 0) worksheets[index] = saved;
   else worksheets.unshift(saved);
   renderAll();
-  loadDescriptionHistory();
+  rememberOwnDescription(saved);
+}
+
+function rememberOwnDescription(item) {
+  const description = String(item?.data?.description || "").trim().replace(/\s+/g, " ");
+  if (!description || item?.userId !== session?.userId) return;
+  const current = readStoredDescriptionHistory(session.userId)
+    ?? aggregateDescriptionHistory(descriptionHistoryLoaded ? descriptionHistory : ownRecentWorksheets());
+  const key = description.toLocaleLowerCase("hu-HU");
+  const existing = current.find(entry => String(entry.data?.description || "").trim().toLocaleLowerCase("hu-HU") === key);
+  if (existing) {
+    existing.data.description = description;
+    existing.descriptionCount = (Number(existing.descriptionCount) || 1) + 1;
+    existing.lastUsedAt = new Date().toISOString();
+  } else {
+    current.unshift({
+      id: `local-description-${uuid()}`,
+      data: { description },
+      descriptionCount: 1,
+      lastUsedAt: new Date().toISOString()
+    });
+  }
+  descriptionHistory = aggregateDescriptionHistory(current);
+  descriptionHistoryLoaded = true;
+  writeStoredDescriptionHistory(session.userId, descriptionHistory);
+  renderDescriptionSuggestions(descriptionHistory);
 }
 
 form.addEventListener("submit", async event => {
@@ -1256,17 +1342,17 @@ function renderRecent() {
   const target = $("#recentWorksheets");
   const recent = ownRecentWorksheets();
   target.innerHTML = recent.length ? recent.map(item => worksheetCardHTML(item)).join("") : `<p class="empty-list">Még nincs beküldött munkalapod.</p>`;
-  renderDescriptionSuggestions(descriptionHistory.length ? descriptionHistory : recent);
+  renderDescriptionSuggestions(descriptionHistoryLoaded ? descriptionHistory : recent);
 }
 
 function renderDescriptionSuggestions(recent = ownRecentWorksheets()) {
   const suggestions = new Map();
   recent.forEach((item, index) => {
     const description = String(item.data?.description || "").trim();
-    const key = searchKey(description);
+    const key = description.toLocaleLowerCase("hu-HU").replace(/\s+/g, " ");
     if (!key) return;
-    const saved = suggestions.get(key) || { description, count: 0, latestIndex: index };
-    saved.count += 1;
+    const saved = suggestions.get(key) || { id: item.id || null, description, count: 0, latestIndex: index };
+    saved.count += Number(item.descriptionCount) || 1;
     saved.latestIndex = Math.min(saved.latestIndex, index);
     suggestions.set(key, saved);
   });
@@ -1274,7 +1360,7 @@ function renderDescriptionSuggestions(recent = ownRecentWorksheets()) {
     .sort((first, second) => second.count - first.count || first.latestIndex - second.latestIndex)
     .slice(0, 6);
   const panel = $("#descriptionSuggestions");
-  $("#descriptionSuggestionList").innerHTML = ranked.map(item => `<button type="button" data-description-suggestion>${escapeHTML(item.description)}</button>`).join("");
+  $("#descriptionSuggestionList").innerHTML = ranked.map(item => `<div class="description-suggestion-row"><button type="button" data-description-suggestion>${escapeHTML(item.description)}</button>${descriptionHistoryLoaded && item.id ? `<button class="description-suggestion-delete" type="button" data-description-delete="${escapeHTML(item.id)}" aria-label="Korábbi feladatleírás törlése" title="Törlés">Törlés</button>` : ""}</div>`).join("");
   panel.hidden = !ranked.length;
   if (!ranked.length) panel.open = false;
 }
@@ -1794,13 +1880,26 @@ async function loadWorksheets(showErrors = true) {
 async function loadDescriptionHistory() {
   if (!session) return;
   const userId = session.userId;
+  const stored = readStoredDescriptionHistory(userId);
+  if (stored) {
+    descriptionHistory = aggregateDescriptionHistory(stored);
+    descriptionHistoryLoaded = true;
+    renderDescriptionSuggestions(descriptionHistory);
+    return;
+  }
   try {
     const history = await MunkalapDB.listDescriptionHistory(userId);
     if (session?.userId !== userId) return;
-    descriptionHistory = history;
-    renderDescriptionSuggestions(descriptionHistory.length ? descriptionHistory : ownRecentWorksheets());
+    descriptionHistory = aggregateDescriptionHistory(history);
+    descriptionHistoryLoaded = true;
+    writeStoredDescriptionHistory(userId, descriptionHistory);
+    renderDescriptionSuggestions(descriptionHistory);
   } catch (_) {
-    // A legutóbbi munkalapokból származó ajánlások hálózati hiba esetén is megmaradnak.
+    if (session?.userId !== userId) return;
+    descriptionHistory = aggregateDescriptionHistory(ownRecentWorksheets());
+    descriptionHistoryLoaded = true;
+    writeStoredDescriptionHistory(userId, descriptionHistory);
+    renderDescriptionSuggestions(descriptionHistory);
   }
 }
 
@@ -2189,6 +2288,7 @@ async function openApp(profile) {
   customersLoading = null;
   customerDirectory = [];
   descriptionHistory = [];
+  descriptionHistoryLoaded = false;
   $("#loginView").hidden = true;
   $("#appView").hidden = false;
   $("#activeUser").textContent = "";
@@ -2356,7 +2456,24 @@ $("#workerCatalog").addEventListener("click", event => {
   }
   if (remove) removeWorkerCatalogItem(remove.dataset.workerCatalogRemove);
 });
-$("#descriptionSuggestions").addEventListener("click", event => {
+$("#descriptionSuggestions").addEventListener("click", async event => {
+  const remove = event.target.closest("[data-description-delete]");
+  if (remove) {
+    if (!confirm("Törlöd ezt a korábbi feladatleírást az ajánlások közül?")) return;
+    remove.disabled = true;
+    try {
+      descriptionHistory = descriptionHistory.filter(item => item.id !== remove.dataset.descriptionDelete);
+      if (!writeStoredDescriptionHistory(session.userId, descriptionHistory)) {
+        throw new Error("A böngésző tárhelye nem érhető el");
+      }
+      renderDescriptionSuggestions(descriptionHistory);
+      showStatus("A korábbi feladatleírás törölve az ajánlások közül.", "success");
+    } catch (error) {
+      remove.disabled = false;
+      showStatus(`A feladatleírás törlése nem sikerült: ${error?.message || "ismeretlen hiba"}.`);
+    }
+    return;
+  }
   const button = event.target.closest("[data-description-suggestion]");
   if (!button) return;
   const description = form.elements.description;
