@@ -1,7 +1,7 @@
 const EMAIL_ENDPOINT = "https://formsubmit.co/ajax/info@diszkertek.hu";
 const EMAIL_RECIPIENT = "info@diszkertek.hu";
 const STABLE_APP_URL = "https://agnesgeller.github.io/diszkertek-munkalap/";
-const APP_VERSION = "91";
+const APP_VERSION = "92";
 const QUEUE_KEY = "diszkertek-munkalap-send-queue-v1";
 const MANAGER_VIEW_KEY = "diszkertek-munkalap-manager-view-v1";
 const DESCRIPTION_HISTORY_KEY = "diszkertek-munkalap-description-history-v1";
@@ -437,7 +437,15 @@ function readQueue() {
       item.record &&
       typeof item.record === "object"
     );
-    if (validQueue.length !== queue.length) {
+    let queueChanged = validQueue.length !== queue.length;
+    validQueue.forEach(item => {
+      if (!item.emailSent && !item.emailHandledManually && item.emailError && !item.emailRetryStopped) {
+        item.emailAttempted = true;
+        item.emailRetryStopped = true;
+        queueChanged = true;
+      }
+    });
+    if (queueChanged) {
       try { localStorage.setItem(QUEUE_KEY, JSON.stringify(validQueue)); }
       catch (_) { /* A használható elemek ettől még feldolgozhatók. */ }
     }
@@ -472,32 +480,54 @@ function ownQueue() {
 
 function updateQueueNotice() {
   const notice = $("#queueNotice");
-  if (!session) { notice.hidden = true; return; }
+  const confirmEmailButton = $("#confirmQueuedEmailButton");
+  if (!session) {
+    notice.hidden = true;
+    confirmEmailButton.hidden = true;
+    return;
+  }
   const queue = ownQueue();
   if (!queue.length) {
     notice.hidden = true;
     notice.textContent = "";
+    confirmEmailButton.hidden = true;
+    confirmEmailButton.dataset.queueId = "";
     return;
   }
-  const emailWaiting = queue.find(item => !item.emailSent && !item.emailHandledManually);
+  const emailWaiting = queue.find(item => !item.emailSent && !item.emailHandledManually && !item.emailRetryStopped);
   if (emailWaiting && !fallbackEmailContext) {
     fallbackEmailContext = { payload: emailWaiting.emailPayload, queueId: emailWaiting.queueId, clearAfterReturn: false };
     fallbackEmailButton.hidden = false;
   }
   const officeDevice = session.role === "manager" || Boolean(session.delegatedBy);
+  notice.hidden = false;
+  const databaseWaiting = queue.filter(item => !item.databaseSaved).length;
+  const emailWaitingCount = queue.filter(item => !item.emailSent && !item.emailHandledManually && !item.emailRetryStopped).length;
+  const emailCheck = queue.find(item => !item.emailSent && !item.emailHandledManually && item.emailRetryStopped);
+  if (!officeDevice && emailCheck) {
+    notice.textContent = "A munkalap elmentve. Az e-mail beérkezését az iroda ellenőrzi. Ne küldd el újra a munkalapot.";
+    confirmEmailButton.hidden = true;
+    fallbackEmailButton.hidden = true;
+    if (fallbackEmailContext?.queueId === emailCheck.queueId) fallbackEmailContext = null;
+    return;
+  }
   if (!officeDevice) {
     notice.hidden = true;
     notice.textContent = "";
+    confirmEmailButton.hidden = true;
     return;
   }
-  notice.hidden = false;
-  const databaseWaiting = queue.filter(item => !item.databaseSaved).length;
-  const emailWaitingCount = queue.filter(item => !item.emailSent && !item.emailHandledManually).length;
   const stages = [];
   if (databaseWaiting) stages.push(`${databaseWaiting} adatbázis-mentése vár`);
   if (emailWaitingCount) stages.push(`${emailWaitingCount} e-mail-küldése vár`);
+  if (emailCheck) stages.push("az e-mail beérkezése ellenőrizendő");
   const lastError = [...queue].reverse().find(item => item.lastError || item.emailError);
-  notice.textContent = `${queue.length} munkalap feldolgozása még nem teljes (${stages.join(", ")}). Az alkalmazás automatikusan újrapróbálja.${lastError ? ` Utolsó hiba: ${lastError.lastError || lastError.emailError}` : ""}`;
+  const retryMessage = databaseWaiting || emailWaitingCount
+    ? "Az alkalmazás a még el nem indított műveletet automatikusan megpróbálja."
+    : "Az e-mailt az alkalmazás nem küldi el újra automatikusan, mert az első példány már megérkezhetett.";
+  notice.textContent = `${queue.length} munkalap feldolgozása még nem teljes (${stages.join(", ")}). ${retryMessage}${lastError ? ` Utolsó hiba: ${lastError.lastError || lastError.emailError}` : ""}`;
+  confirmEmailButton.hidden = !emailCheck;
+  confirmEmailButton.dataset.queueId = emailCheck?.queueId || "";
 }
 
 function isNetworkError(error) {
@@ -522,6 +552,8 @@ function makeQueueItem(action, record, emailPayload, databaseSaved = false) {
     databaseSaved,
     emailSent: false,
     emailHandledManually: false,
+    emailAttempted: false,
+    emailRetryStopped: false,
     queuedAt: new Date().toISOString()
   };
 }
@@ -577,10 +609,13 @@ async function syncQueue() {
       const fallbackDecisionPending =
         fallbackEmailContext?.queueId === item.queueId &&
         (externalEmailInProgress || $("#fallbackConfirmDialog").open);
-      if (!item.emailSent && !item.emailHandledManually && !fallbackDecisionPending) {
+      if (!item.emailSent && !item.emailHandledManually && !item.emailRetryStopped && !fallbackDecisionPending) {
+        item.emailAttempted = true;
+        changed = true;
         try {
           await sendEmail(item.emailPayload);
           item.emailSent = true;
+          item.emailRetryStopped = false;
           delete item.emailError;
           changed = true;
           if (clearEmailFallbackStatus(item.record) && item.databaseSaved) {
@@ -594,6 +629,8 @@ async function syncQueue() {
           }
         } catch (error) {
           item.emailError = error?.message || "E-mail-küldési hiba";
+          item.emailRetryStopped = true;
+          changed = true;
         }
       }
     }
@@ -1054,6 +1091,7 @@ form.addEventListener("submit", async event => {
     let saved = null;
     let databaseError = null;
     let emailError = null;
+    let emailAttempted = false;
 
     if ((!record.customerId || !record.locationId) && navigator.onLine) {
       try {
@@ -1070,6 +1108,7 @@ form.addEventListener("submit", async event => {
     }
 
     if (navigator.onLine) {
+      emailAttempted = true;
       const databaseTask = existing
         ? MunkalapDB.update(record.id, record)
         : MunkalapDB.create(record, session.userId);
@@ -1102,6 +1141,9 @@ form.addEventListener("submit", async event => {
     const queued = makeQueueItem(action, queuedRecord, emailPayload, Boolean(saved));
     queued.statusUpdatePending = Boolean(saved && emailError);
     queued.emailSent = !emailError;
+    queued.emailAttempted = emailAttempted;
+    queued.emailRetryStopped = Boolean(emailError && emailAttempted);
+    if (emailError) queued.emailError = emailError?.message || "E-mail-küldési hiba";
     if (databaseError) queued.lastError = databaseError?.message || "ismeretlen mentési hiba";
     addQueueItem(queued);
 
@@ -1113,9 +1155,15 @@ form.addEventListener("submit", async event => {
     }
 
     pendingCurrentQueueId = queued.queueId;
-    fallbackEmailContext = { payload: emailPayload, queueId: queued.queueId, clearAfterReturn: true };
-    fallbackEmailButton.hidden = false;
-    showStatus("Az automatikus küldés nem sikerült. Nyomd meg a „Küldés e-mail alkalmazással” gombot.", "pending");
+    if (emailAttempted) {
+      fallbackEmailContext = null;
+      fallbackEmailButton.hidden = true;
+      showStatus("A munkalap elmentve. Az e-mail beérkezését az iroda ellenőrzi. Ne küldd el újra a munkalapot.", "pending");
+    } else {
+      fallbackEmailContext = { payload: emailPayload, queueId: queued.queueId, clearAfterReturn: true };
+      fallbackEmailButton.hidden = false;
+      showStatus("Nincs internetkapcsolat. A munkalap elküldését az alkalmazás később automatikusan megpróbálja.", "pending");
+    }
   } finally {
     button.disabled = false;
     button.textContent = editingId ? "Módosítás mentése" : "Munkalap elküldése";
@@ -1133,6 +1181,23 @@ fallbackEmailButton.addEventListener("click", () => {
   }
   externalEmailInProgress = true;
   window.location.href = fallbackEmailUrl(fallbackEmailContext.payload);
+});
+
+$("#confirmQueuedEmailButton").addEventListener("click", async event => {
+  const queueId = event.currentTarget.dataset.queueId;
+  if (!queueId) return;
+  const queue = readQueue();
+  const item = queue.find(entry => entry.queueId === queueId);
+  if (!item) { updateQueueNotice(); return; }
+  item.emailHandledManually = true;
+  item.emailRetryStopped = true;
+  delete item.emailError;
+  if (clearEmailFallbackStatus(item.record) && item.databaseSaved) item.statusUpdatePending = true;
+  if (fallbackEmailContext?.queueId === queueId) fallbackEmailContext = null;
+  fallbackEmailButton.hidden = true;
+  writeQueue(queue);
+  await syncQueue();
+  showStatus("Az e-mail beérkezését rögzítettük. A munkalapot az alkalmazás nem küldi el újra.", "success");
 });
 
 function finishExternalEmail() {
@@ -2380,8 +2445,9 @@ $("#reloadHistory").addEventListener("click", async () => {
     if (waiting && (session.role === "manager" || session.delegatedBy)) {
       const pending = ownQueue();
       const databaseWaiting = pending.filter(item => !item.databaseSaved).length;
-      const emailWaiting = pending.filter(item => !item.emailSent && !item.emailHandledManually).length;
-      showStatus(`${waiting} munkalap feldolgozása még nem teljes: ${databaseWaiting} adatbázis-mentés és ${emailWaiting} e-mail-küldés vár. A részletes hiba a Munkalapjaim felett látható.`, "pending");
+      const emailWaiting = pending.filter(item => !item.emailSent && !item.emailHandledManually && !item.emailRetryStopped).length;
+      const emailCheck = pending.filter(item => !item.emailSent && !item.emailHandledManually && item.emailRetryStopped).length;
+      showStatus(`${waiting} munkalap feldolgozása még nem teljes: ${databaseWaiting} adatbázis-mentés, ${emailWaiting} e-mail-küldés vár${emailCheck ? `, ${emailCheck} e-mail beérkezése ellenőrizendő` : ""}. A részletes jelzés a Munkalapjaim felett látható.`, "pending");
     } else if (waiting) {
       showStatus("A munkalapok frissítése folyamatban van. Az alkalmazás automatikusan folytatja.", "pending");
     } else {
