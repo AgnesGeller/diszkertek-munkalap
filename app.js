@@ -1,7 +1,7 @@
 const EMAIL_ENDPOINT = "https://formsubmit.co/info@diszkertek.hu";
 const EMAIL_RECIPIENT = "info@diszkertek.hu";
 const STABLE_APP_URL = "https://agnesgeller.github.io/diszkertek-munkalap/";
-const APP_VERSION = "77";
+const APP_VERSION = "78";
 const QUEUE_KEY = "diszkertek-munkalap-send-queue-v1";
 const MANAGER_VIEW_KEY = "diszkertek-munkalap-manager-view-v1";
 const DATABASE_FREE_LIMIT = 500 * 1024 * 1024;
@@ -583,31 +583,27 @@ function renderWorkerCatalogSuggestions() {
   input.setAttribute("aria-expanded", String(Boolean(matches.length)));
 }
 
-function workerCatalogFamily(item) {
-  const familyName = searchKey(workerCatalogLabel(item?.label)).split(" ")[0];
-  if (!familyName) return [];
-  return workerCatalogItems.filter(candidate => {
-    const candidateName = searchKey(workerCatalogLabel(candidate.label));
-    return candidateName === familyName || candidateName.startsWith(`${familyName} `);
-  });
+function workerCatalogFeedback(message = "") {
+  const target = $("#workerCatalogFeedback");
+  target.textContent = message;
+  target.hidden = !message;
 }
 
-function showWorkerCatalogFamily(item) {
-  const family = workerCatalogFamily(item);
-  if (family.length < 2) return false;
-  const details = $("#workerCatalogSearch").closest("details");
-  details.open = true;
-  $("#workerCatalogSearch").value = workerCatalogLabel(item.label).trim().split(/\s+/)[0];
-  renderWorkerCatalogSuggestions();
-  details.scrollIntoView({ behavior: "smooth", block: "nearest" });
-  return true;
+function vibrateWorkerCatalog(duration = 35) {
+  if (typeof navigator.vibrate === "function") navigator.vibrate(duration);
 }
 
 function renderWorkerSelectedItems() {
   const target = $("#workerSelectedItems");
   target.innerHTML = [...selectedWorkerCatalogItems.values()].map(item => `<div class="worker-selected-item" data-worker-selected="${escapeHTML(item.code)}"><span>${escapeHTML(workerCatalogLabel(item.label))}</span><label>Mennyiség (${escapeHTML(item.unit)})<input data-worker-catalog-quantity type="text" inputmode="decimal" pattern="[0-9]+([,.][0-9]{1,3})?" maxlength="20" value="${escapeHTML(item.quantity)}" aria-label="${escapeHTML(workerCatalogLabel(item.label))} mennyisége"></label><button type="button" data-worker-catalog-remove="${escapeHTML(item.code)}">Törlés</button></div>`).join("");
+  const selectedCount = selectedWorkerCatalogItems.size;
+  $("#workerSelectedCount").textContent = selectedCount ? `(${selectedCount})` : "(még nincs)";
+  $("#workerSelectedPanel").classList.toggle("has-items", Boolean(selectedCount));
   for (const button of $("#workerPopularItems").querySelectorAll("[data-worker-catalog-add]")) {
-    button.setAttribute("aria-pressed", String(selectedWorkerCatalogItems.has(button.dataset.workerCatalogAdd)));
+    const selected = selectedWorkerCatalogItems.has(button.dataset.workerCatalogAdd);
+    button.setAttribute("aria-pressed", String(selected));
+    const state = button.querySelector("small");
+    if (state) state.textContent = selected ? "✓ Kiválasztva" : "Kiválasztás";
   }
 }
 
@@ -619,7 +615,10 @@ function renderWorkerCatalog() {
   }
   const used = workerCatalogItems.filter(item => Number(item.usage_count) > 0);
   const popular = (used.length ? used : workerCatalogItems).slice(0, 10);
-  $("#workerPopularItems").innerHTML = popular.map(item => `<button type="button" data-worker-catalog-add="${escapeHTML(item.code)}" aria-pressed="${selectedWorkerCatalogItems.has(item.code)}"><span>${escapeHTML(workerCatalogLabel(item.label))}</span></button>`).join("");
+  $("#workerPopularItems").innerHTML = popular.map(item => {
+    const selected = selectedWorkerCatalogItems.has(item.code);
+    return `<button type="button" data-worker-catalog-add="${escapeHTML(item.code)}" aria-pressed="${selected}"><span>${escapeHTML(workerCatalogLabel(item.label))}</span><small>${selected ? "✓ Kiválasztva" : "Kiválasztás"}</small></button>`;
+  }).join("");
   $("#workerPopularItems").hidden = !workerCatalogItems.length;
   $("#workerCatalogSearch").closest("details").hidden = !workerCatalogItems.length;
   section.hidden = false;
@@ -638,20 +637,31 @@ function addWorkerCatalogItem(code) {
   }
   formDirty = true;
   renderWorkerSelectedItems();
+  $("#workerSelectedPanel").open = true;
+  workerCatalogFeedback(`${workerCatalogLabel(item.label)} kiválasztva. Ellenőrizd a mennyiséget.`);
+  vibrateWorkerCatalog();
+  const selectedRow = [...$("#workerSelectedItems").querySelectorAll("[data-worker-selected]")]
+    .find(row => row.dataset.workerSelected === code);
+  selectedRow?.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
 function removeWorkerCatalogItem(code) {
+  const item = selectedWorkerCatalogItems.get(code);
   selectedWorkerCatalogItems.delete(code);
   const field = workerCatalogField(code);
   if (field) field.value = "";
   formDirty = true;
   renderWorkerSelectedItems();
+  workerCatalogFeedback(item ? `${workerCatalogLabel(item.label)} törölve.` : "A tétel törölve.");
+  vibrateWorkerCatalog(20);
 }
 
 function resetWorkerCatalog() {
   selectedWorkerCatalogItems.clear();
   if ($("#workerCatalogSearch")) $("#workerCatalogSearch").value = "";
   if ($("#workerCatalogSuggestions")) $("#workerCatalogSuggestions").hidden = true;
+  if ($("#workerSelectedPanel")) $("#workerSelectedPanel").open = false;
+  workerCatalogFeedback();
   renderWorkerCatalog();
 }
 
@@ -1107,6 +1117,27 @@ function renderRecent() {
   const target = $("#recentWorksheets");
   const recent = ownRecentWorksheets();
   target.innerHTML = recent.length ? recent.map(item => worksheetCardHTML(item)).join("") : `<p class="empty-list">Még nincs beküldött munkalapod.</p>`;
+  renderDescriptionSuggestions(recent);
+}
+
+function renderDescriptionSuggestions(recent = ownRecentWorksheets()) {
+  const suggestions = new Map();
+  recent.forEach((item, index) => {
+    const description = String(item.data?.description || "").trim();
+    const key = searchKey(description);
+    if (!key) return;
+    const saved = suggestions.get(key) || { description, count: 0, latestIndex: index };
+    saved.count += 1;
+    saved.latestIndex = Math.min(saved.latestIndex, index);
+    suggestions.set(key, saved);
+  });
+  const ranked = [...suggestions.values()]
+    .sort((first, second) => second.count - first.count || first.latestIndex - second.latestIndex)
+    .slice(0, 6);
+  const panel = $("#descriptionSuggestions");
+  $("#descriptionSuggestionList").innerHTML = ranked.map(item => `<button type="button" data-description-suggestion>${escapeHTML(item.description)}</button>`).join("");
+  panel.hidden = !ranked.length;
+  if (!ranked.length) panel.open = false;
 }
 
 function officeAddressKey(value) {
@@ -2038,6 +2069,7 @@ async function logout() {
   workerCatalogItems = [];
   selectedWorkerCatalogItems.clear();
   $("#workerCatalog").hidden = true;
+  renderDescriptionSuggestions([]);
   $("#appView").hidden = true;
   $("#loginView").hidden = false;
   selectedProfile = canSwitchProfile ? "" : previousSession?.name || "";
@@ -2134,8 +2166,7 @@ $("#workerCatalog").addEventListener("click", event => {
     if (isPopularItem && selectedWorkerCatalogItems.has(code)) {
       removeWorkerCatalogItem(code);
     } else {
-      const item = workerCatalogItems.find(row => row.code === code);
-      if (!isPopularItem || !showWorkerCatalogFamily(item)) addWorkerCatalogItem(code);
+      addWorkerCatalogItem(code);
     }
     if (!isPopularItem) {
       $("#workerCatalogSearch").value = "";
@@ -2143,6 +2174,18 @@ $("#workerCatalog").addEventListener("click", event => {
     }
   }
   if (remove) removeWorkerCatalogItem(remove.dataset.workerCatalogRemove);
+});
+$("#descriptionSuggestions").addEventListener("click", event => {
+  const button = event.target.closest("[data-description-suggestion]");
+  if (!button) return;
+  const description = form.elements.description;
+  const suggestion = button.textContent.trim();
+  const current = description.value.trim();
+  if (!current) description.value = suggestion;
+  else if (!searchKey(current).includes(searchKey(suggestion))) description.value = `${current}\n${suggestion}`;
+  description.dispatchEvent(new Event("input", { bubbles: true }));
+  description.focus();
+  vibrateWorkerCatalog(25);
 });
 $("#workerSelectedItems").addEventListener("input", event => {
   const input = event.target.closest("[data-worker-catalog-quantity]");

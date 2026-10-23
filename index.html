@@ -12,7 +12,7 @@
   <link rel="apple-touch-icon" href="munkalap-m-icon-apple-180-v12.png">
   <link rel="stylesheet" href="styles.css?v=69">
   <link rel="stylesheet" href="logo-overrides.css?v=69">
-  <link rel="stylesheet" href="app-shell.css?v=77">
+  <link rel="stylesheet" href="app-shell.css?v=78">
   <title>Díszkertek – Napi munkalap</title>
   <meta name="description" content="Díszkertek napi munkalapok és ügyfélnyilvántartás.">
   <meta property="og:title" content="Díszkertek – Napi munkalap">
@@ -97,22 +97,39 @@
         </section>
 
         <label class="description"><b>Feladat leírás / megjegyzés:</b><textarea name="description" rows="2" required></textarea></label>
+        <details id="descriptionSuggestions" class="description-suggestions" hidden>
+          <summary>Korábbi feladatleírások</summary>
+          <p>Ha megfelel valamelyik, érintsd meg. Új szöveget is bármikor írhatsz.</p>
+          <div id="descriptionSuggestionList"></div>
+        </details>
 
         <section class="materials-section">
           <h2>Anyag és fuvar</h2>
           <section id="workerCatalog" class="worker-catalog" aria-labelledby="workerCatalogTitle" hidden>
             <div class="worker-catalog-heading">
-              <h3 id="workerCatalogTitle">Gyakran használt tételek</h3>
-              <small>Az elmúlt 90 nap alapján</small>
+              <h3 id="workerCatalogTitle">Anyag vagy fuvar rögzítése</h3>
             </div>
-            <div id="workerPopularItems" class="worker-popular-items"></div>
-            <details class="worker-catalog-search">
+            <ol class="worker-catalog-steps">
+              <li>Válaszd ki a tételt.</li>
+              <li>Ellenőrizd vagy írd át a mennyiséget.</li>
+              <li>A kijelölést ugyanarra a zöld gombra érintve visszavonhatod.</li>
+            </ol>
+            <p id="workerCatalogFeedback" class="worker-catalog-feedback" role="status" aria-live="polite" hidden></p>
+            <details class="worker-catalog-panel worker-popular-panel" open>
+              <summary>Gyakran használt tételek</summary>
+              <small>Az elmúlt 90 nap alapján</small>
+              <div id="workerPopularItems" class="worker-popular-items"></div>
+            </details>
+            <details id="workerSelectedPanel" class="worker-catalog-panel worker-selected-panel">
+              <summary>Kiválasztott tételek és mennyiségek <span id="workerSelectedCount"></span></summary>
+              <div id="workerSelectedItems" class="worker-selected-items"></div>
+            </details>
+            <details class="worker-catalog-panel worker-catalog-search">
               <summary>Más tétel keresése</summary>
               <label for="workerCatalogSearch">Tétel neve</label>
               <input id="workerCatalogSearch" type="search" autocomplete="off" placeholder="Írj be legalább 3 betűt" aria-controls="workerCatalogSuggestions" aria-expanded="false">
               <div id="workerCatalogSuggestions" class="worker-catalog-suggestions" hidden></div>
             </details>
-            <div id="workerSelectedItems" class="worker-selected-items"></div>
           </section>
           <div class="material-columns">
             <div class="material-group"><h3>Kertkarbantartás</h3><div id="maintenanceItems"></div></div>
@@ -334,7 +351,7 @@
   <script src="supabase.js?v=69"></script>
   <script src="supabase-config.js?v=69"></script>
   <script src="munkalap-data.js?v=76"></script>
-  <script src="app.js?v=77"></script>
+  <script src="app.js?v=78"></script>
   <script src="billing-math.js?v=76"></script>
   <script src="billing-settlements.js?v=76"></script>
   <script src="statistics-settlements.js?v=69"></script>
