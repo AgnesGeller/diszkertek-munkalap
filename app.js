@@ -1,7 +1,7 @@
 const EMAIL_ENDPOINT = "https://formsubmit.co/info@diszkertek.hu";
 const EMAIL_RECIPIENT = "info@diszkertek.hu";
 const STABLE_APP_URL = "https://agnesgeller.github.io/diszkertek-munkalap/";
-const APP_VERSION = "84";
+const APP_VERSION = "85";
 const QUEUE_KEY = "diszkertek-munkalap-send-queue-v1";
 const MANAGER_VIEW_KEY = "diszkertek-munkalap-manager-view-v1";
 const DATABASE_FREE_LIMIT = 500 * 1024 * 1024;
@@ -733,6 +733,7 @@ function renderWorkerCatalog() {
   $("#workerPopularItems").hidden = !workerCatalogItems.length;
   $("#workerCatalogSearch").closest("details").hidden = !workerCatalogItems.length;
   section.hidden = false;
+  if (selectedWorkerCatalogItems.size) section.open = true;
   renderWorkerSelectedItems();
   renderWorkerCatalogSuggestions();
 }
@@ -769,6 +770,9 @@ function removeWorkerCatalogItem(code) {
 
 function resetWorkerCatalog() {
   selectedWorkerCatalogItems.clear();
+  if ($("#workerCatalog")) $("#workerCatalog").open = false;
+  const legacyPanel = document.querySelector(".legacy-material-panel");
+  if (legacyPanel) legacyPanel.open = false;
   if ($("#workerCatalogSearch")) $("#workerCatalogSearch").value = "";
   if ($("#workerCatalogSuggestions")) $("#workerCatalogSuggestions").hidden = true;
   if ($("#workerSelectedPanel")) $("#workerSelectedPanel").open = false;
