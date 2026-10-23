@@ -12,7 +12,7 @@
   <link rel="apple-touch-icon" href="munkalap-m-icon-apple-180-v12.png">
   <link rel="stylesheet" href="styles.css?v=69">
   <link rel="stylesheet" href="logo-overrides.css?v=69">
-  <link rel="stylesheet" href="app-shell.css?v=78">
+  <link rel="stylesheet" href="app-shell.css?v=79">
   <title>Díszkertek – Napi munkalap</title>
   <meta name="description" content="Díszkertek napi munkalapok és ügyfélnyilvántartás.">
   <meta property="og:title" content="Díszkertek – Napi munkalap">
@@ -111,17 +111,18 @@
             </div>
             <ol class="worker-catalog-steps">
               <li>Válaszd ki a tételt.</li>
-              <li>Ellenőrizd vagy írd át a mennyiséget.</li>
+              <li>Írd be a mennyiséget. A „✓ Beírva a munkalapra” jelzi, hogy rendben van.</li>
               <li>A kijelölést ugyanarra a zöld gombra érintve visszavonhatod.</li>
             </ol>
             <p id="workerCatalogFeedback" class="worker-catalog-feedback" role="status" aria-live="polite" hidden></p>
-            <details class="worker-catalog-panel worker-popular-panel" open>
+            <details class="worker-catalog-panel worker-popular-panel">
               <summary>Gyakran használt tételek</summary>
               <small>Az elmúlt 90 nap alapján</small>
               <div id="workerPopularItems" class="worker-popular-items"></div>
             </details>
             <details id="workerSelectedPanel" class="worker-catalog-panel worker-selected-panel">
               <summary>Kiválasztott tételek és mennyiségek <span id="workerSelectedCount"></span></summary>
+              <p class="worker-selected-help">A „✓ Beírva a munkalapra” jelzés után a tétel már része a kitöltésnek. Véglegesen a „Munkalap elküldése” gombbal kerül mentésre.</p>
               <div id="workerSelectedItems" class="worker-selected-items"></div>
             </details>
             <details class="worker-catalog-panel worker-catalog-search">
@@ -351,7 +352,7 @@
   <script src="supabase.js?v=69"></script>
   <script src="supabase-config.js?v=69"></script>
   <script src="munkalap-data.js?v=76"></script>
-  <script src="app.js?v=78"></script>
+  <script src="app.js?v=79"></script>
   <script src="billing-math.js?v=76"></script>
   <script src="billing-settlements.js?v=76"></script>
   <script src="statistics-settlements.js?v=69"></script>

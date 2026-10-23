@@ -1,7 +1,7 @@
 const EMAIL_ENDPOINT = "https://formsubmit.co/info@diszkertek.hu";
 const EMAIL_RECIPIENT = "info@diszkertek.hu";
 const STABLE_APP_URL = "https://agnesgeller.github.io/diszkertek-munkalap/";
-const APP_VERSION = "78";
+const APP_VERSION = "79";
 const QUEUE_KEY = "diszkertek-munkalap-send-queue-v1";
 const MANAGER_VIEW_KEY = "diszkertek-munkalap-manager-view-v1";
 const DATABASE_FREE_LIMIT = 500 * 1024 * 1024;
@@ -593,11 +593,40 @@ function vibrateWorkerCatalog(duration = 35) {
   if (typeof navigator.vibrate === "function") navigator.vibrate(duration);
 }
 
+function workerCatalogQuantityIsValid(value) {
+  const normalized = String(value || "").trim().replace(",", ".");
+  return /^\d+(?:\.\d{1,3})?$/.test(normalized)
+    && Number(normalized) > 0
+    && Number(normalized) <= 1000000;
+}
+
+function workerCatalogProgressText() {
+  const items = [...selectedWorkerCatalogItems.values()];
+  if (!items.length) return "(még nincs)";
+  const completed = items.filter(item => workerCatalogQuantityIsValid(item.quantity)).length;
+  return completed === items.length
+    ? `(${completed} kész)`
+    : `(${completed} kész, ${items.length - completed} hiányzik)`;
+}
+
+function updateWorkerCatalogQuantityState(row, item) {
+  const valid = workerCatalogQuantityIsValid(item?.quantity);
+  row.classList.toggle("quantity-ready", valid);
+  row.classList.toggle("quantity-missing", !valid);
+  const status = row.querySelector("[data-worker-quantity-status]");
+  if (status) status.textContent = valid ? "✓ Beírva a munkalapra" : "Mennyiség hiányzik";
+  $("#workerSelectedCount").textContent = workerCatalogProgressText();
+  return valid;
+}
+
 function renderWorkerSelectedItems() {
   const target = $("#workerSelectedItems");
-  target.innerHTML = [...selectedWorkerCatalogItems.values()].map(item => `<div class="worker-selected-item" data-worker-selected="${escapeHTML(item.code)}"><span>${escapeHTML(workerCatalogLabel(item.label))}</span><label>Mennyiség (${escapeHTML(item.unit)})<input data-worker-catalog-quantity type="text" inputmode="decimal" pattern="[0-9]+([,.][0-9]{1,3})?" maxlength="20" value="${escapeHTML(item.quantity)}" aria-label="${escapeHTML(workerCatalogLabel(item.label))} mennyisége"></label><button type="button" data-worker-catalog-remove="${escapeHTML(item.code)}">Törlés</button></div>`).join("");
+  target.innerHTML = [...selectedWorkerCatalogItems.values()].map(item => {
+    const valid = workerCatalogQuantityIsValid(item.quantity);
+    return `<div class="worker-selected-item ${valid ? "quantity-ready" : "quantity-missing"}" data-worker-selected="${escapeHTML(item.code)}"><span>${escapeHTML(workerCatalogLabel(item.label))}</span><label>Mennyiség (${escapeHTML(item.unit)})<input data-worker-catalog-quantity type="text" inputmode="decimal" pattern="[0-9]+([,.][0-9]{1,3})?" maxlength="20" value="${escapeHTML(item.quantity)}" aria-label="${escapeHTML(workerCatalogLabel(item.label))} mennyisége"><small data-worker-quantity-status>${valid ? "✓ Beírva a munkalapra" : "Mennyiség hiányzik"}</small></label><button type="button" data-worker-catalog-remove="${escapeHTML(item.code)}">Törlés</button></div>`;
+  }).join("");
   const selectedCount = selectedWorkerCatalogItems.size;
-  $("#workerSelectedCount").textContent = selectedCount ? `(${selectedCount})` : "(még nincs)";
+  $("#workerSelectedCount").textContent = workerCatalogProgressText();
   $("#workerSelectedPanel").classList.toggle("has-items", Boolean(selectedCount));
   for (const button of $("#workerPopularItems").querySelectorAll("[data-worker-catalog-add]")) {
     const selected = selectedWorkerCatalogItems.has(button.dataset.workerCatalogAdd);
@@ -661,6 +690,10 @@ function resetWorkerCatalog() {
   if ($("#workerCatalogSearch")) $("#workerCatalogSearch").value = "";
   if ($("#workerCatalogSuggestions")) $("#workerCatalogSuggestions").hidden = true;
   if ($("#workerSelectedPanel")) $("#workerSelectedPanel").open = false;
+  const popularPanel = $("#workerCatalog .worker-popular-panel");
+  const searchPanel = $("#workerCatalog .worker-catalog-search");
+  if (popularPanel) popularPanel.open = false;
+  if (searchPanel) searchPanel.open = false;
   workerCatalogFeedback();
   renderWorkerCatalog();
 }
@@ -762,8 +795,7 @@ function validateWorkerCatalogItems() {
   let firstInvalid = null;
   for (const input of $("#workerSelectedItems").querySelectorAll("[data-worker-catalog-quantity]")) {
     input.setCustomValidity("");
-    const value = input.value.trim().replace(",", ".");
-    if (!/^\d+(?:\.\d{1,3})?$/.test(value) || Number(value) <= 0 || Number(value) > 1000000) {
+    if (!workerCatalogQuantityIsValid(input.value)) {
       input.setCustomValidity("Adj meg 0-nál nagyobb, legfeljebb három tizedesjegyű mennyiséget.");
       firstInvalid ||= input;
     }
@@ -2196,6 +2228,15 @@ $("#workerSelectedItems").addEventListener("input", event => {
   input.setCustomValidity("");
   const field = workerCatalogField(item.code);
   if (field) field.value = input.value;
+  updateWorkerCatalogQuantityState(row, item);
+});
+$("#workerSelectedItems").addEventListener("change", event => {
+  const input = event.target.closest("[data-worker-catalog-quantity]");
+  const row = input?.closest("[data-worker-selected]");
+  const item = row && selectedWorkerCatalogItems.get(row.dataset.workerSelected);
+  if (!input || !item || !updateWorkerCatalogQuantityState(row, item)) return;
+  workerCatalogFeedback(`${workerCatalogLabel(item.label)} mennyisége beírva: ${item.quantity} ${item.unit}.`);
+  vibrateWorkerCatalog(25);
 });
 $(".materials-section").addEventListener("change", event => {
   const item = workerCatalogItems.find(row => row.code === event.target.name);
