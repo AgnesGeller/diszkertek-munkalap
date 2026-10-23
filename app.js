@@ -1,7 +1,7 @@
 const EMAIL_ENDPOINT = "https://formsubmit.co/info@diszkertek.hu";
 const EMAIL_RECIPIENT = "info@diszkertek.hu";
 const STABLE_APP_URL = "https://agnesgeller.github.io/diszkertek-munkalap/";
-const APP_VERSION = "94";
+const APP_VERSION = "96";
 const QUEUE_KEY = "diszkertek-munkalap-send-queue-v1";
 const MANAGER_VIEW_KEY = "diszkertek-munkalap-manager-view-v1";
 const DESCRIPTION_HISTORY_KEY = "diszkertek-munkalap-description-history-v1";
@@ -589,6 +589,20 @@ async function syncQueue() {
     for (const item of queue.filter(entry => canSyncAll || (entry.queuedBy || entry.userId) === session.userId)) {
       if (!item.databaseSaved) {
         try {
+          if ((!item.record.customerId || !item.record.locationId) && navigator.onLine) {
+            try {
+              const linked = await withTimeout(
+                MunkalapDB.registerCustomerSuggestion(item.record.customer, item.record.address),
+                5000,
+                "Az ügyféllista most nem érhető el."
+              );
+              item.record.customerId = linked.customerId;
+              item.record.locationId = linked.locationId;
+              changed = true;
+            } catch (_) {
+              // Az ügyféllista hibája nem akadályozhatja a munkalap háttérben történő mentését.
+            }
+          }
           const databaseTask = item.action === "update"
             ? MunkalapDB.update(item.record.id, item.record)
             : MunkalapDB.create(item.record, item.record.userId);
@@ -1096,90 +1110,28 @@ form.addEventListener("submit", async event => {
   button.textContent = existing ? "Módosítás mentése…" : "Küldés folyamatban…";
 
   try {
-    let saved = null;
-    let databaseError = null;
     let emailError = null;
     let emailAttempted = false;
-
-    if ((!record.customerId || !record.locationId) && navigator.onLine) {
-      try {
-        const linked = await withTimeout(
-          MunkalapDB.registerCustomerSuggestion(record.customer, record.address),
-          5000,
-          "Az ügyféllista most nem érhető el."
-        );
-        record.customerId = linked.customerId;
-        record.locationId = linked.locationId;
-      } catch (_) {
-        // Az ügyféllista hibája nem akadályozhatja a munkalap beküldését.
-      }
-    }
-
     if (navigator.onLine) {
       emailAttempted = true;
-      const databaseTask = existing
-        ? MunkalapDB.update(record.id, record)
-        : MunkalapDB.create(record, session.userId);
-      const [databaseResult, emailResult] = await Promise.allSettled([
-        withTimeout(Promise.resolve(databaseTask), 12000, "Az adatbázis-kapcsolat túl sokáig várakozott."),
-        sendEmail(emailPayload)
-      ]);
-      if (databaseResult.status === "fulfilled") {
-        saved = databaseResult.value;
-        updateWorksheetCache(saved);
-      } else {
-        databaseError = databaseResult.reason;
-      }
-      if (emailResult.status === "rejected") emailError = emailResult.reason;
+      try { await sendEmail(emailPayload); }
+      catch (error) { emailError = error; }
     } else {
-      databaseError = new TypeError("Nincs internetkapcsolat");
       emailError = new TypeError("Nincs internetkapcsolat");
     }
 
-    if (!databaseError && !emailError) {
-      resetForm();
-      showSuccessDialog();
-      return;
-    }
-
-    if (databaseError && emailError) record.data._officeStatus = "database_delayed_email_fallback";
-    else if (databaseError) record.data._officeStatus = "database_delayed";
-    else if (emailError) record.data._officeStatus = "email_fallback";
-    const queuedRecord = saved ? { ...record, ...saved, data: { ...record.data } } : record;
-    const queued = makeQueueItem(action, queuedRecord, emailPayload, Boolean(saved));
-    queued.statusUpdatePending = Boolean(saved && emailError);
+    if (emailError) record.data._officeStatus = navigator.onLine ? "email_fallback" : "database_delayed_email_fallback";
+    const queued = makeQueueItem(action, record, emailPayload, false);
+    queued.statusUpdatePending = false;
     queued.emailSent = !emailError;
     queued.emailAttempted = emailAttempted;
     queued.emailRetryStopped = Boolean(emailError && emailAttempted);
     if (emailError) queued.emailError = emailError?.message || "E-mail-küldési hiba";
-    if (databaseError) queued.lastError = databaseError?.message || "ismeretlen mentési hiba";
     addQueueItem(queued);
 
-    if (!emailError) {
-      resetForm();
-      updateQueueNotice();
-      showSuccessDialog();
-      return;
-    }
-
-    pendingCurrentQueueId = queued.queueId;
-    if (emailAttempted) {
-      fallbackEmailContext = null;
-      fallbackEmailButton.hidden = true;
-      const officeDevice = session.role === "manager";
-      if (!officeDevice) {
-        pendingCurrentQueueId = null;
-        resetForm();
-        showSuccessDialog();
-        syncQueue();
-        return;
-      }
-      showStatus("Az e-mail beérkezése ellenőrizendő. Az alkalmazás nem küldi el újra automatikusan.", "pending");
-    } else {
-      fallbackEmailContext = { payload: emailPayload, queueId: queued.queueId, clearAfterReturn: true };
-      fallbackEmailButton.hidden = false;
-      showStatus("Nincs internetkapcsolat. A munkalap elküldését az alkalmazás később automatikusan megpróbálja.", "pending");
-    }
+    resetForm();
+    showSuccessDialog();
+    syncQueue();
   } finally {
     button.disabled = false;
     button.textContent = editingId ? "Módosítás mentése" : "Munkalap elküldése";

@@ -37,4 +37,12 @@ assert.match(source, /if \(!officeDevice\) \{[\s\S]*?resetForm\(\);[\s\S]*?showS
 assert.match(source, /confirmEmailButton\.hidden = !emailCheck/);
 assert.match(source, /A kézi újraküldést rögzítettük\. A figyelmeztetés megmarad/);
 assert.match(source, /Az automatikus FormSubmit-küldés nem sikerült/);
-console.log('PASS: visszaigazolt FormSubmit-küldés és kézi küldésnél megmaradó figyelmeztetés.');
+const submitStart = source.indexOf('form.addEventListener("submit", async event => {');
+const submitEnd = source.indexOf('fallbackEmailButton.addEventListener', submitStart);
+assert.ok(submitStart >= 0 && submitEnd > submitStart, 'A munkalap beküldési folyamata hiányzik.');
+const submitHandler = source.slice(submitStart, submitEnd);
+assert.doesNotMatch(submitHandler, /Promise\.allSettled/);
+assert.doesNotMatch(submitHandler, /await withTimeout\([\s\S]*?MunkalapDB/);
+assert.match(submitHandler, /addQueueItem\(queued\);[\s\S]*?resetForm\(\);[\s\S]*?showSuccessDialog\(\);[\s\S]*?syncQueue\(\);/);
+assert.match(source, /if \(\(!item\.record\.customerId \|\| !item\.record\.locationId\)[\s\S]*?MunkalapDB\.registerCustomerSuggestion/);
+console.log('PASS: az azonnali FormSubmit-küldés, a háttérmentés és a kézi küldés figyelmeztetése rendben van.');
