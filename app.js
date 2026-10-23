@@ -1,7 +1,7 @@
-const EMAIL_ENDPOINT = "https://formsubmit.co/info@diszkertek.hu";
+const EMAIL_ENDPOINT = "https://formsubmit.co/ajax/info@diszkertek.hu";
 const EMAIL_RECIPIENT = "info@diszkertek.hu";
 const STABLE_APP_URL = "https://agnesgeller.github.io/diszkertek-munkalap/";
-const APP_VERSION = "90";
+const APP_VERSION = "91";
 const QUEUE_KEY = "diszkertek-munkalap-send-queue-v1";
 const MANAGER_VIEW_KEY = "diszkertek-munkalap-manager-view-v1";
 const DESCRIPTION_HISTORY_KEY = "diszkertek-munkalap-description-history-v1";
@@ -374,57 +374,30 @@ function fallbackEmailUrl(payload) {
 
 async function sendEmail(payload) {
   if (LOCAL_PREVIEW) return;
-  await new Promise((resolve, reject) => {
-    const token = uuid();
-    const frame = document.createElement("iframe");
-    const formElement = document.createElement("form");
-    const frameName = `munkalap-email-${token}`;
-    let finished = false;
-    let timeout;
-    const cleanup = () => {
-      clearTimeout(timeout);
-      frame.remove();
-      formElement.remove();
-    };
-    const finish = callback => {
-      if (finished) return;
-      finished = true;
-      cleanup();
-      callback();
-    };
-    frame.name = frameName;
-    frame.hidden = true;
-    frame.title = "Munkalap e-mail-küldés";
-    frame.addEventListener("load", () => {
-      try {
-        const resultUrl = new URL(frame.contentWindow.location.href);
-        const expectedPath = new URL("email-sent.html", STABLE_APP_URL).pathname;
-        if (resultUrl.origin === location.origin && resultUrl.pathname === expectedPath && resultUrl.searchParams.get("token") === token) {
-          finish(resolve);
-        }
-      } catch (_) {
-        // A FormSubmit oldal más eredetű; csak a saját sikeroldalra visszatérés igazolja a küldést.
-      }
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000);
+  let response;
+  try {
+    response = await fetch(EMAIL_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+      },
+      body: JSON.stringify(payload || {}),
+      signal: controller.signal
     });
-    formElement.method = "POST";
-    formElement.action = EMAIL_ENDPOINT;
-    formElement.target = frameName;
-    formElement.hidden = true;
-    const fields = {
-      ...(payload || {}),
-      _next: new URL(`email-sent.html?token=${encodeURIComponent(token)}`, STABLE_APP_URL).href
-    };
-    Object.entries(fields).forEach(([name, value]) => {
-      const input = document.createElement("input");
-      input.type = "hidden";
-      input.name = name;
-      input.value = String(value ?? "");
-      formElement.append(input);
-    });
-    document.body.append(frame, formElement);
-    timeout = setTimeout(() => finish(() => reject(new Error("A FormSubmit nem igazolta vissza az e-mail elküldését."))), 30000);
-    formElement.submit();
-  });
+  } catch (error) {
+    if (error?.name === "AbortError") throw new Error("Az automatikus e-mail-küldés túl sokáig várakozott.");
+    throw new Error("Az automatikus e-mail-küldés nem érte el a FormSubmit szolgáltatást.");
+  } finally {
+    clearTimeout(timeout);
+  }
+  const result = await response.json().catch(() => null);
+  const confirmed = result?.success === true || String(result?.success).toLowerCase() === "true";
+  if (!response.ok || !confirmed) {
+    throw new Error(result?.message || `A FormSubmit nem igazolta vissza az e-mail elküldését (${response.status}).`);
+  }
 }
 
 function showStatus(message, kind = "error") {
