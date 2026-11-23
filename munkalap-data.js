@@ -7,11 +7,12 @@
     "Ági": "agi@munkalap.diszkertek.hu",
     "Attila": "attila@munkalap.diszkertek.hu",
     "Bendegúz": "bendeguz@munkalap.diszkertek.hu",
+    "Ferenc": "ferenc@gmail.com",
     "Gábor": "gabor@munkalap.diszkertek.hu",
     "Márk": "mark@munkalap.diszkertek.hu",
     "Tamás": "tamas@munkalap.diszkertek.hu"
   };
-  const MANAGER_NAMES = ["Ági", "Tamás"];
+  const MANAGER_NAMES = ["Ági", "Ferenc", "Tamás"];
 
   const config = window.MUNKALAP_SUPABASE || {};
   const previewMode = ["localhost", "127.0.0.1"].includes(window.location.hostname)
@@ -189,7 +190,7 @@
   async function profileFor(user) {
     const { data, error } = await client
       .from("profiles")
-      .select("id,display_name,role")
+      .select("id,display_name,role,access_expires_at")
       .eq("id", user.id)
       .single();
     if (error) throw error;
@@ -197,7 +198,13 @@
       localStorage.removeItem(PROFILE_KEY);
       throw new Error("Ez a felhasználó már nem jogosult a MUNKALAP használatára.");
     }
-    const profile = { userId: data.id, name: data.display_name, role: data.role };
+    const accessExpiresAt = data.access_expires_at || null;
+    if (accessExpiresAt && new Date(accessExpiresAt).getTime() <= Date.now()) {
+      forgetRememberedSession(data.display_name);
+      localStorage.removeItem(PROFILE_KEY);
+      throw new Error("A hozzáférés lejárt. Kérj új jogosultságot az irodától.");
+    }
+    const profile = { userId: data.id, name: data.display_name, role: data.role, accessExpiresAt };
     try { localStorage.setItem(PROFILE_KEY, JSON.stringify(profile)); }
     catch (_) { /* A profil ettől még használható az aktuális munkamenetben. */ }
     return profile;
@@ -261,7 +268,7 @@
           }
         }
         if (!managerProfile || !managerUser) {
-          throw new Error("Az irodai belépés lejárt. Ági vagy Tamás PIN-kódját add meg újra egyszer.");
+          throw new Error("Az irodai belépés lejárt. Egy irodai manager PIN-kódját add meg újra egyszer.");
         }
         const { data: target, error: targetError } = await client
           .from("profiles")
@@ -312,15 +319,25 @@
         localStorage.removeItem(PROFILE_KEY);
         return null;
       }
+      const authenticatedProfile = await profileFor(data.session.user);
       try {
         const cached = JSON.parse(localStorage.getItem(PROFILE_KEY));
         const sameUser = cached?.userId === data.session.user.id || cached?.authUserId === data.session.user.id;
-        if (sameUser && EMAILS[cached?.name]) return cached;
+        if (sameUser && EMAILS[cached?.name]) {
+          if (cached?.authUserId === data.session.user.id && cached?.delegatedBy) {
+            if (authenticatedProfile.role !== "manager") throw new Error("Ehhez a névváltáshoz nincs irodai jogosultság.");
+            const delegated = { ...cached, managerAccessExpiresAt: authenticatedProfile.accessExpiresAt || null };
+            try { localStorage.setItem(PROFILE_KEY, JSON.stringify(delegated)); }
+            catch (_) { /* A névváltás ettől még használható az aktuális munkamenetben. */ }
+            return delegated;
+          }
+          return authenticatedProfile;
+        }
         localStorage.removeItem(PROFILE_KEY);
       } catch (_) {
         localStorage.removeItem(PROFILE_KEY);
       }
-      return profileFor(data.session.user);
+      return authenticatedProfile;
     },
 
     async logout() {

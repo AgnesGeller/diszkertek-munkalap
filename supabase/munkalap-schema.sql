@@ -34,6 +34,7 @@ create table if not exists munkalap.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   display_name text not null unique,
   role text not null default 'worker' check (role in ('worker', 'manager')),
+  access_expires_at timestamptz,
   created_at timestamptz not null default now()
 );
 
@@ -74,6 +75,7 @@ as $$
     from munkalap.profiles
     where id = (select auth.uid())
       and role = 'manager'
+      and (access_expires_at is null or access_expires_at > now())
   )
 $$;
 
