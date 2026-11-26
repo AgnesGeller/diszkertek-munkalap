@@ -1,7 +1,7 @@
 const EMAIL_ENDPOINT = "https://formsubmit.co/info@diszkertek.hu";
 const EMAIL_RECIPIENT = "info@diszkertek.hu";
 const STABLE_APP_URL = "https://agnesgeller.github.io/diszkertek-munkalap/";
-const APP_VERSION = "101";
+const APP_VERSION = "102";
 const QUEUE_KEY = "diszkertek-munkalap-send-queue-v1";
 const MANAGER_VIEW_KEY = "diszkertek-munkalap-manager-view-v1";
 const DESCRIPTION_HISTORY_KEY = "diszkertek-munkalap-description-history-v1";
@@ -2106,7 +2106,7 @@ async function openProcurement() {
   const content = $("#procurementContent");
   content.textContent = "Anyagok betöltése…";
   try {
-    const { mountProcurement } = await import("./munkalap-procurement.mjs?v=101");
+    const { mountProcurement } = await import("./munkalap-procurement.mjs?v=102");
     if (manager === session && managerView === "procurement" && !procurementScreen) {
       procurementScreen = mountProcurement(content, MunkalapDB);
     }

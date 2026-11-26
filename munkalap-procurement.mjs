@@ -3,7 +3,23 @@ const PURCHASE_BASE = 5000;
 const LOADING_RATE = 20000;
 const currency = new Intl.NumberFormat("hu-HU", { style: "currency", currency: "HUF", maximumFractionDigits: 0 });
 const kg = new Intl.NumberFormat("hu-HU", { maximumFractionDigits: 3 });
-const money = value => value == null ? "Kikeresendő" : currency.format(value);
+const money = value => value == null ? "—" : currency.format(value);
+
+export function supplierPhoneLink(value) {
+  const raw = String(value ?? "").trim();
+  if (!/^[+\d][\d() .-]*$/.test(raw)) return null;
+  const number = raw.replace(/[^+\d]/g, "").replace(/^00/, "+");
+  return /^\+?\d{7,15}$/.test(number) ? `tel:${number}` : null;
+}
+
+function supplierSourceLink(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && !url.username && !url.password ? url.href : null;
+  } catch (_) {
+    return null;
+  }
+}
 
 export function parseProcurementNumber(value) {
   const clean = String(value ?? "").trim().replace(/[ \u00a0\u202f]/g, "").replace(",", ".");
@@ -33,6 +49,18 @@ export function calculateProcurement(material, { quantity, purchaseKm, deliveryK
 }
 
 const groups = [
+  ["Rendelési adatok", [
+    ["order_supplier", "Ajánlott kereskedő, ha eltér a korábbitól", 240],
+    ["supplier_contact_address", "Rendelési vagy átvételi cím", 500],
+    ["supplier_phone", "Telefonszám", 50],
+    ["supplier_contact_url", "Rendelési oldal (HTTPS)", 500],
+    ["order_note", "Rendelési megjegyzés", 500]
+  ]],
+  ["Korábbi beszerzés", [
+    ["supplier", "Korábbi beszállító", 240],
+    ["supplier_location", "Korábbi vásárlás vagy rendelés helye", 500],
+    ["purchase_reference", "Vásárlás forrása", 500]
+  ]],
   ["Anyag adatai", [
     ["name", "Anyag megnevezése", 240], ["unit", "Mértékegység", 80],
     ["category", "Kategória", 100], ["unit_weight", "Egységenkénti anyagsúly (kg)", "positive"]
@@ -50,8 +78,6 @@ const groups = [
     ["sale_price", "Eladási ár (Ft/egység)", "money"],
     ["accessory_price", "Kiegészítő anyag díja (Ft/egység)", "money"],
     ["accessory_name", "Kiegészítő anyag megnevezése", 240],
-    ["supplier", "Beszerzési partner", 240],
-    ["supplier_location", "Beszerzés helye", 500],
     ["notes", "Megjegyzés", 2000]
   ]]
 ];
@@ -61,7 +87,7 @@ const labelFor = (name, label, type) => {
   if (type === "checkbox") return `<label class="procurement-check"><input name="${name}" type="checkbox"> ${label}</label>`;
   const attrs = typeof type === "number" ? `maxlength="${type}"` : 'inputmode="decimal" maxlength="20"';
   return `<label>${label}${name === "notes" ? '<textarea name="notes" maxlength="2000" rows="3"></textarea>'
-    : `<input name="${name}" ${attrs} ${name === "name" ? "required" : ""}>`}</label>`;
+    : `<input name="${name}" ${attrs} ${name === "name" ? "required" : name === "supplier_phone" ? 'type="tel"' : ""}>`}</label>`;
 };
 
 export function mountProcurement(root, db) {
@@ -70,12 +96,12 @@ export function mountProcurement(root, db) {
     const stylesheet = document.createElement("link");
     stylesheet.id = styleId;
     stylesheet.rel = "stylesheet";
-    stylesheet.href = new URL("./munkalap-procurement.css?v=101", import.meta.url);
+    stylesheet.href = new URL("./munkalap-procurement.css?v=102", import.meta.url);
     document.head.append(stylesheet);
   }
   root.innerHTML = `
     <div class="procurement-toolbar">
-      <label>Anyag keresése<input data-find type="search" placeholder="Anyagnév, beszerzési partner vagy hely"></label>
+      <label>Anyag keresése<input data-find type="search" placeholder="Anyagnév, beszállító vagy cím"></label>
       <button data-add type="button" disabled>+ Új anyag</button>
       <button data-reload type="button">Újratöltés</button>
     </div>
@@ -132,6 +158,8 @@ export function mountProcurement(root, db) {
       }
     }
     if (strict && !material.name) throw new Error("Add meg az anyag nevét.");
+    if (strict && material.supplier_phone && !supplierPhoneLink(material.supplier_phone)) throw new Error("Adj meg érvényes telefonszámot.");
+    if (strict && material.supplier_contact_url && !supplierSourceLink(material.supplier_contact_url)) throw new Error("Az elérhetőségi oldal címe https:// kezdetű legyen.");
     return material;
   }
 
@@ -146,8 +174,9 @@ export function mountProcurement(root, db) {
       quantity: readNumber("quote_quantity"), purchaseKm: readNumber("purchase_km"),
       deliveryKm: readNumber("delivery_km"), manualLoading: control("manual_loading").checked
     });
-    $("[data-supplier-place]").textContent = material.supplier_location
-      ? `Beszerzési út: pomázi telephely → ${material.supplier_location}` : "A beszerzési hely még nincs megadva.";
+    const destination = material.supplier_contact_address || (!material.order_supplier ? material.supplier_location : "");
+    $("[data-supplier-place]").textContent = destination
+      ? `Beszerzési út: pomázi telephely → ${destination}` : "Webes vagy telefonos rendelésnél az átvétel helyét egyeztesd a kereskedővel.";
     const weight = value => value == null ? "—" : `${kg.format(value)} kg`;
     const result = [
       ["Raklapos súly (anyag)", weight(totals.palletWeight)],
@@ -179,25 +208,52 @@ export function mountProcurement(root, db) {
   const fold = value => String(value ?? "").toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "");
   function render() {
     const query = fold($("[data-find]").value).trim();
-    const results = records.filter(item => fold([item.name, item.category, item.supplier, item.supplier_location].join(" ")).includes(query));
+    const results = records.filter(item => fold([item.name, item.category, item.supplier, item.order_supplier, item.supplier_location, item.supplier_contact_address].join(" ")).includes(query));
     $("[data-results]").replaceChildren(...results.map(item => {
       const row = document.createElement("li");
       const description = document.createElement("div");
       const title = document.createElement("strong");
       const supplier = document.createElement("small");
       const location = document.createElement("small");
+      const address = document.createElement("small");
+      const contact = document.createElement("small");
       const meta = document.createElement("small");
       const button = document.createElement("button");
       title.textContent = item.name;
       supplier.className = "procurement-source";
-      supplier.textContent = "Beszerzési partner: " + (item.supplier?.trim() || "Kikeresendő");
-      location.textContent = "Beszerzés helye: " + (item.supplier_location?.trim() || "Kikeresendő");
-      meta.textContent = [item.unit, item.category, item.is_palletized ? "Raklapos" : "", item.unit_weight == null ? "Súly kikeresendő" : ""].filter(Boolean).join(" · ");
+      const recommended = item.order_supplier?.trim();
+      const previous = item.supplier?.trim();
+      const merchant = recommended || previous;
+      supplier.textContent = merchant ? (recommended ? "Ajánlott kereskedő: " : "Rendelési forrás: ") + merchant : "";
+      if (item.supplier_contact_address?.trim()) address.textContent = item.supplier_contact_address.trim();
+      contact.className = "procurement-contact";
+      const phone = supplierPhoneLink(item.supplier_phone);
+      if (phone) {
+        const call = document.createElement("a");
+        call.href = phone;
+        call.textContent = item.supplier_phone;
+        contact.append(call);
+      }
+      const source = supplierSourceLink(item.supplier_contact_url);
+      if (source) {
+        const link = document.createElement("a");
+        link.href = source;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        link.textContent = "Rendelés / elérhetőség";
+        if (phone) contact.append(" · ");
+        contact.append(link);
+      }
+      const history = [previous, item.supplier_location?.trim()].filter(Boolean).join(" · ");
+      if (history) location.textContent = "Korábbi vásárlás: " + history;
+      const orderNote = document.createElement("small");
+      orderNote.textContent = item.order_note?.trim() || "";
+      meta.textContent = [item.unit, item.category, item.is_palletized ? "Raklapos" : ""].filter(Boolean).join(" · ");
       button.type = "button";
       button.textContent = "Részletek";
       button.setAttribute("aria-label", `Részletek: ${item.name}`);
       button.addEventListener("click", () => open(item));
-      description.append(title, supplier, location, meta);
+      description.append(title, ...[supplier, address, contact, orderNote, location, meta].filter(node => node.textContent));
       row.append(description, button);
       return row;
     }));

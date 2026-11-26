@@ -72,6 +72,12 @@
   color: #493820;
   font-weight: 700;
 }
+.procurement-contact a {
+  display: inline-block;
+  padding-block: 5px;
+  color: #563813;
+  text-decoration: underline;
+}
 #procurementContent .procurement-dialog {
   width: min(750px, calc(100% - 20px));
   max-height: 90dvh;

@@ -4,11 +4,15 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 test("az anyagbeszerzés helyes raklap-, fuvar- és rakodási díjat számol", async () => {
-  const { calculateProcurement, parseProcurementNumber } = await import("../munkalap-procurement.mjs");
+  const { calculateProcurement, parseProcurementNumber, supplierPhoneLink } = await import("../munkalap-procurement.mjs");
   assert.equal(parseProcurementNumber("20 000"), 20000);
   assert.equal(parseProcurementNumber("0,2"), 0.2);
   assert.equal(parseProcurementNumber(""), null);
   assert.ok(Number.isNaN(parseProcurementNumber("-5")));
+  assert.equal(supplierPhoneLink("+36 (26) 326-023"), "tel:+3626326023");
+  assert.equal(supplierPhoneLink("0036 26 326 023"), "tel:+3626326023");
+  assert.equal(supplierPhoneLink("12"), null);
+  assert.equal(supplierPhoneLink("javascript:alert(1)"), null);
 
   const material = {
     is_palletized: true, unit_weight: 25, pallet_quantity: 48, pallet_fee: 1500,
