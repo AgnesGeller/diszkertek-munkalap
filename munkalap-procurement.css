@@ -1,7 +1,6 @@
 #procurementContent {
   padding: clamp(10px, 3vw, 20px);
   border: 1px solid #d8c4a6;
-  border-top: 0;
   background: #fbf6ed;
   color: #493820;
   font: 15px Arial, sans-serif;
@@ -68,6 +67,10 @@
   display: block;
   margin-top: 4px;
   color: #624d31;
+}
+.procurement-list .procurement-source {
+  color: #493820;
+  font-weight: 700;
 }
 #procurementContent .procurement-dialog {
   width: min(750px, calc(100% - 20px));

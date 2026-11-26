@@ -30,8 +30,9 @@ test("az anyagbeszerzés helyes raklap-, fuvar- és rakodási díjat számol", a
 
 test("az anyagbeszerzés külön irodai panel, az adatokra irodai RLS vonatkozik", () => {
   const read = file => fs.readFileSync(path.join(__dirname, "..", file), "utf8");
-  assert.match(read("index.html"), /<section id="officeView"[^>]*hidden>\s*<details id="procurementPanel">/);
-  assert.match(read("app.js"), /if \(!procurementPanel\.open \|\| session\?\.role !== "manager" \|\| procurementScreen\) return;/);
+  assert.match(read("index.html"), /id="statisticsTab"[^\n]*\n[^\n]*id="worksheetTab"[^\n]*\n[^\n]*id="procurementTab"/);
+  assert.match(read("index.html"), /<section id="procurementView"[^>]*hidden>/);
+  assert.match(read("app.js"), /if \(session\?\.role !== "manager" \|\| procurementScreen\) return;/);
   const sql = read("supabase/munkalap-procurement.sql");
   assert.match(sql, /alter table munkalap\.procurement_materials enable row level security/);
   assert.match(sql, /using \(\(select munkalap_private\.is_manager\(\)\)\)/);

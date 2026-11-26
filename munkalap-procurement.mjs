@@ -70,12 +70,12 @@ export function mountProcurement(root, db) {
     const stylesheet = document.createElement("link");
     stylesheet.id = styleId;
     stylesheet.rel = "stylesheet";
-    stylesheet.href = new URL("./munkalap-procurement.css?v=100", import.meta.url);
+    stylesheet.href = new URL("./munkalap-procurement.css?v=101", import.meta.url);
     document.head.append(stylesheet);
   }
   root.innerHTML = `
     <div class="procurement-toolbar">
-      <label>Anyag keresése<input data-find type="search" placeholder="Név, kategória vagy partner"></label>
+      <label>Anyag keresése<input data-find type="search" placeholder="Anyagnév, beszerzési partner vagy hely"></label>
       <button data-add type="button" disabled>+ Új anyag</button>
       <button data-reload type="button">Újratöltés</button>
     </div>
@@ -179,20 +179,25 @@ export function mountProcurement(root, db) {
   const fold = value => String(value ?? "").toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "");
   function render() {
     const query = fold($("[data-find]").value).trim();
-    const results = records.filter(item => fold([item.name, item.category, item.supplier].join(" ")).includes(query));
+    const results = records.filter(item => fold([item.name, item.category, item.supplier, item.supplier_location].join(" ")).includes(query));
     $("[data-results]").replaceChildren(...results.map(item => {
       const row = document.createElement("li");
       const description = document.createElement("div");
       const title = document.createElement("strong");
+      const supplier = document.createElement("small");
+      const location = document.createElement("small");
       const meta = document.createElement("small");
       const button = document.createElement("button");
       title.textContent = item.name;
+      supplier.className = "procurement-source";
+      supplier.textContent = "Beszerzési partner: " + (item.supplier?.trim() || "Kikeresendő");
+      location.textContent = "Beszerzés helye: " + (item.supplier_location?.trim() || "Kikeresendő");
       meta.textContent = [item.unit, item.category, item.is_palletized ? "Raklapos" : "", item.unit_weight == null ? "Súly kikeresendő" : ""].filter(Boolean).join(" · ");
       button.type = "button";
-      button.textContent = "Megnyitás";
-      button.setAttribute("aria-label", `Megnyitás: ${item.name}`);
+      button.textContent = "Részletek";
+      button.setAttribute("aria-label", `Részletek: ${item.name}`);
       button.addEventListener("click", () => open(item));
-      description.append(title, meta);
+      description.append(title, supplier, location, meta);
       row.append(description, button);
       return row;
     }));
@@ -270,5 +275,13 @@ export function mountProcurement(root, db) {
     }
   });
   load();
-  return { destroy() { active = false; if (dialog.open) dialog.close(); root.replaceChildren(); } };
+  return {
+    canLeave() {
+      if (!dialog.open) return true;
+      if (!canClose()) return false;
+      dialog.close();
+      return true;
+    },
+    destroy() { active = false; if (dialog.open) dialog.close(); root.replaceChildren(); }
+  };
 }

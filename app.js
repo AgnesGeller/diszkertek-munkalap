@@ -1,7 +1,7 @@
 const EMAIL_ENDPOINT = "https://formsubmit.co/info@diszkertek.hu";
 const EMAIL_RECIPIENT = "info@diszkertek.hu";
 const STABLE_APP_URL = "https://agnesgeller.github.io/diszkertek-munkalap/";
-const APP_VERSION = "100";
+const APP_VERSION = "101";
 const QUEUE_KEY = "diszkertek-munkalap-send-queue-v1";
 const MANAGER_VIEW_KEY = "diszkertek-munkalap-manager-view-v1";
 const DESCRIPTION_HISTORY_KEY = "diszkertek-munkalap-description-history-v1";
@@ -2056,8 +2056,9 @@ function hasManagerAuthority() {
 function setManagerView(view, options = {}) {
   if (session?.role !== "manager") return;
   if (managerView === "budget" && view !== "budget" && !window.Billing?.canLeave()) return;
+  if (managerView === "procurement" && view !== "procurement" && procurementScreen?.canLeave() === false) return false;
   const previousView = managerView;
-  managerView = ["office", "customers", "worksheet", "budget", "statistics"].includes(view) ? view : "worksheet";
+  managerView = ["office", "customers", "worksheet", "budget", "statistics", "procurement"].includes(view) ? view : "worksheet";
   officeViewActive = managerView === "office";
   localStorage.setItem(MANAGER_VIEW_KEY, managerView);
   $("#officeView").hidden = !officeViewActive;
@@ -2065,11 +2066,15 @@ function setManagerView(view, options = {}) {
   $("#worksheetView").hidden = managerView !== "worksheet";
   $("#budgetView").hidden = managerView !== "budget";
   $("#statisticsView").hidden = managerView !== "statistics";
+  $("#procurementView").hidden = managerView !== "procurement";
   $("#budgetTab").classList.toggle("active", managerView === "budget");
   $("#officeTab").classList.toggle("active", officeViewActive);
   $("#customersTab").classList.toggle("active", managerView === "customers");
   $("#statisticsTab").classList.toggle("active", managerView === "statistics");
   $("#worksheetTab").classList.toggle("active", managerView === "worksheet");
+  $("#procurementTab").classList.toggle("active", managerView === "procurement");
+  if (managerView === "procurement") $("#procurementTab").setAttribute("aria-current", "page");
+  else $("#procurementTab").removeAttribute("aria-current");
   if (!options.skipHistory && previousView !== managerView) pushAppHistory(managerView);
   if (officeViewActive) {
     if (officeWeekActive) applyOfficeWeek();
@@ -2084,35 +2089,36 @@ function setManagerView(view, options = {}) {
   }
   if (managerView === "budget") return window.Billing?.show();
   if (managerView === "statistics") return window.Statistics?.show();
+  if (managerView === "procurement") openProcurement();
 }
 
 $("#officeTab").addEventListener("click", () => setManagerView("office"));
 let procurementScreen;
-const procurementPanel = $("#procurementPanel");
 function resetProcurement() {
-  procurementPanel.open = false;
+  $("#procurementView").hidden = true;
   procurementScreen?.destroy();
   procurementScreen = null;
   $("#procurementContent").replaceChildren();
 }
-procurementPanel.addEventListener("toggle", async () => {
-  if (!procurementPanel.open || session?.role !== "manager" || procurementScreen) return;
+async function openProcurement() {
+  if (session?.role !== "manager" || procurementScreen) return;
   const manager = session;
   const content = $("#procurementContent");
   content.textContent = "Anyagok betöltése…";
   try {
-    const { mountProcurement } = await import("./munkalap-procurement.mjs?v=100");
-    if (manager === session && procurementPanel.open && !procurementScreen) {
+    const { mountProcurement } = await import("./munkalap-procurement.mjs?v=101");
+    if (manager === session && managerView === "procurement" && !procurementScreen) {
       procurementScreen = mountProcurement(content, MunkalapDB);
     }
   } catch (_) {
-    if (manager === session) content.textContent = "Az Anyagbeszerzés nem nyitható meg. Csukd be, majd nyisd meg újra.";
+    if (manager === session) content.textContent = "Az Anyagbeszerzés nem nyitható meg. Kattints újra az Anyagbeszerzés gombra.";
   }
-});
+}
 $("#customersTab").addEventListener("click", () => setManagerView("customers"));
 $("#budgetTab").addEventListener("click", () => setManagerView("budget"));
 $("#statisticsTab").addEventListener("click", () => setManagerView("statistics"));
 $("#worksheetTab").addEventListener("click", () => setManagerView("worksheet"));
+$("#procurementTab").addEventListener("click", () => setManagerView("procurement"));
 $("#previousOfficeWeek").addEventListener("click", () => moveOfficeWeek(-7));
 $("#nextOfficeWeek").addEventListener("click", () => moveOfficeWeek(7));
 $("#showAllOfficeWeeks").addEventListener("click", () => {
@@ -2432,7 +2438,7 @@ window.addEventListener("popstate", event => {
       if (session.role === "manager") setManagerView(target, { skipHistory: true });
       return;
     }
-    if (session.role === "manager") setManagerView(event.state.view || "worksheet", { skipHistory: true });
+    if (session.role === "manager") restoreCurrent = setManagerView(event.state.view || "worksheet", { skipHistory: true }) === false;
   } finally {
     handlingAppHistory = false;
     if (restoreCurrent) setTimeout(() => pushAppHistory(managerView, window.Billing?.isEditing?.() ? "settlement" : editingId ? "worksheet-edit" : ""), 0);
