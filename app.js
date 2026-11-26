@@ -1,7 +1,7 @@
 const EMAIL_ENDPOINT = "https://formsubmit.co/info@diszkertek.hu";
 const EMAIL_RECIPIENT = "info@diszkertek.hu";
 const STABLE_APP_URL = "https://agnesgeller.github.io/diszkertek-munkalap/";
-const APP_VERSION = "99";
+const APP_VERSION = "100";
 const QUEUE_KEY = "diszkertek-munkalap-send-queue-v1";
 const MANAGER_VIEW_KEY = "diszkertek-munkalap-manager-view-v1";
 const DESCRIPTION_HISTORY_KEY = "diszkertek-munkalap-description-history-v1";
@@ -2087,6 +2087,28 @@ function setManagerView(view, options = {}) {
 }
 
 $("#officeTab").addEventListener("click", () => setManagerView("office"));
+let procurementScreen;
+const procurementPanel = $("#procurementPanel");
+function resetProcurement() {
+  procurementPanel.open = false;
+  procurementScreen?.destroy();
+  procurementScreen = null;
+  $("#procurementContent").replaceChildren();
+}
+procurementPanel.addEventListener("toggle", async () => {
+  if (!procurementPanel.open || session?.role !== "manager" || procurementScreen) return;
+  const manager = session;
+  const content = $("#procurementContent");
+  content.textContent = "Anyagok betöltése…";
+  try {
+    const { mountProcurement } = await import("./munkalap-procurement.mjs?v=100");
+    if (manager === session && procurementPanel.open && !procurementScreen) {
+      procurementScreen = mountProcurement(content, MunkalapDB);
+    }
+  } catch (_) {
+    if (manager === session) content.textContent = "Az Anyagbeszerzés nem nyitható meg. Csukd be, majd nyisd meg újra.";
+  }
+});
 $("#customersTab").addEventListener("click", () => setManagerView("customers"));
 $("#budgetTab").addEventListener("click", () => setManagerView("budget"));
 $("#statisticsTab").addEventListener("click", () => setManagerView("statistics"));
@@ -2296,6 +2318,7 @@ $("#enterButton").addEventListener("click", login);
 $("#pinField").addEventListener("keydown", event => { if (event.key === "Enter") login(); });
 
 async function openApp(profile) {
+  resetProcurement();
   window.Billing?.reset();
   window.Statistics?.reset();
   session = profile;
@@ -2363,6 +2386,7 @@ async function logout() {
   const previousSession = session;
   const canSwitchProfile = previousSession?.role === "manager" || Boolean(previousSession?.delegatedBy);
   await MunkalapDB.logout();
+  resetProcurement();
   window.Billing?.reset();
   window.Statistics?.reset();
   session = null;

@@ -185,3 +185,18 @@ button{font-family:Arial,sans-serif}
   body.print-budget #printSettlement{display:block!important}
   body.print-budget{background:#fff}.print-settlement{box-sizing:border-box;width:210mm;padding:12mm 16mm;-webkit-print-color-adjust:exact;print-color-adjust:exact}.print-settlement header,.print-settlement .settlement-customer,.print-settlement .settlement-summary,.print-settlement footer,.print-settlement tr{break-inside:avoid}.print-settlement h2{break-after:avoid}.print-settlement thead{display:table-header-group}
 }
+
+#procurementPanel { margin: 0 0 14px; }
+#procurementPanel > summary {
+  cursor: pointer;
+  min-height: 44px;
+  padding: 13px 14px;
+  border: 1px solid #cbb28a;
+  border-radius: 6px;
+  background: #f1e4ce;
+  color: #513c22;
+  font: bold 16px Arial, sans-serif;
+}
+#procurementPanel[open] > summary { border-radius: 6px 6px 0 0; }
+#procurementPanel > summary:focus-visible { outline: 2px solid #835f26; outline-offset: 2px; }
+@media print { #procurementPanel { display: none !important; } }

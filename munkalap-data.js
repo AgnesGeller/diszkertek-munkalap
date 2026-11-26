@@ -30,6 +30,7 @@
   let previewProfile = null;
   let previewWorksheets = [];
   let previewCustomers = [];
+  let previewProcurement = [];
   let previewPrices = [{code:'labor',label:'Munkadíj',unit:'Ft / fő / óra',unit_price:1,confirmed:false,updated_at:'preview'}];
   const previewBilling = new Map();
   const previewSettlements = new Map();
@@ -696,6 +697,34 @@
       });
       if (error) throw error;
       return data || { id };
+    },
+
+    async procurementMaterials() {
+      if (previewMode) {
+        if (previewProfile?.role !== "manager") throw new Error("Nincs irodai jogosultság.");
+        return structuredClone(previewProcurement);
+      }
+      const { data, error } = await client.from("procurement_materials")
+        .select("*").order("usage_count", { ascending: false }).order("name").order("id");
+      if (error) throw error;
+      return data;
+    },
+
+    async saveProcurementMaterial(fields, existing) {
+      if (previewMode) {
+        if (previewProfile?.role !== "manager") throw new Error("Nincs irodai jogosultság.");
+        const saved = { ...fields, id: existing?.id || crypto.randomUUID(), usage_count: existing?.usage_count || 0 };
+        previewProcurement = [...previewProcurement.filter(item => item.id !== saved.id), saved];
+        return structuredClone(saved);
+      }
+      const table = client.from("procurement_materials");
+      const request = existing
+        ? table.update(fields).eq("id", existing.id).eq("updated_at", existing.updated_at)
+        : table.insert(fields);
+      const { data, error } = await request.select("*").maybeSingle();
+      if (error) throw error;
+      if (!data) throw new Error("A tétel időközben megváltozott.");
+      return data;
     },
 
     async billingPrices() {

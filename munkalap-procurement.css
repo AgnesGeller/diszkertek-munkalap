@@ -1,0 +1,136 @@
+#procurementContent {
+  padding: clamp(10px, 3vw, 20px);
+  border: 1px solid #d8c4a6;
+  border-top: 0;
+  background: #fbf6ed;
+  color: #493820;
+  font: 15px Arial, sans-serif;
+}
+.procurement-toolbar,
+.procurement-grid {
+  display: grid;
+  gap: 12px;
+  align-items: end;
+}
+.procurement-toolbar {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.procurement-toolbar label {
+  grid-column: 1 / -1;
+}
+#procurementContent label {
+  display: grid;
+  gap: 5px;
+  font-weight: 700;
+}
+#procurementContent :is(input:not([type="checkbox"]), textarea) {
+  width: 100%;
+  min-height: 44px;
+  padding: 9px 10px;
+  border: 1px solid #c4ac88;
+  border-radius: 5px;
+  background: #fffdf9;
+  color: #33271b;
+  font: 16px Arial, sans-serif;
+}
+#procurementContent :is(button, input, textarea, summary):focus-visible {
+  outline: 2px solid #835f26;
+  outline-offset: 2px;
+}
+#procurementContent button {
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid #836740;
+  border-radius: 5px;
+  background: #f0e3cb;
+  color: #4b3822;
+  font: bold 14px Arial, sans-serif;
+  cursor: pointer;
+}
+#procurementContent button:disabled { opacity: .55; }
+.procurement-list {
+  max-height: min(55vh, 460px);
+  overflow: auto;
+  margin: 0;
+  padding: 0 3px 0 0;
+  list-style: none;
+}
+.procurement-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #e0d1b9;
+  overflow-wrap: anywhere;
+}
+.procurement-list small {
+  display: block;
+  margin-top: 4px;
+  color: #624d31;
+}
+#procurementContent .procurement-dialog {
+  width: min(750px, calc(100% - 20px));
+  max-height: 90dvh;
+  overflow: auto;
+  padding: 0 clamp(12px, 4vw, 24px) 20px;
+  background: #fffbf3;
+  color: #493820;
+  text-align: left;
+}
+.procurement-dialog header {
+  position: sticky;
+  z-index: 1;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 0;
+  background: #fffbf3;
+  border-bottom: 1px solid #dfcba9;
+}
+.procurement-dialog h2 {
+  margin: 0;
+  color: #493820;
+  font: bold clamp(18px, 4vw, 23px) Georgia, serif;
+  overflow-wrap: anywhere;
+}
+.procurement-dialog fieldset {
+  min-width: 0;
+  margin: 14px 0;
+  padding: 10px;
+  border: 1px solid #dfcba9;
+}
+.procurement-dialog legend { font-weight: bold; }
+#procurementContent .procurement-check {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+}
+.procurement-check input { width: 20px; height: 20px; }
+.procurement-calculator {
+  padding: 10px;
+  border: 1px solid #dfcba9;
+  background: #fbf3e5;
+}
+.procurement-calculator summary { cursor: pointer; font-weight: bold; }
+.procurement-help { color: #65513a; font-size: 14px; }
+.procurement-totals {
+  margin-bottom: 0;
+}
+.procurement-totals div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 6px;
+  padding: 6px 0;
+  border-top: 1px solid #e3d6bf;
+}
+.procurement-totals dd { margin: 0; font-weight: bold; }
+#procurementContent [data-save] { background: #70542d; color: white; }
+@media (min-width: 640px) {
+  .procurement-toolbar { grid-template-columns: minmax(0, 1fr) auto auto; }
+  .procurement-toolbar label { grid-column: auto; }
+  .procurement-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
